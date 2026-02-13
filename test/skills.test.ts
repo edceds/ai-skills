@@ -27,11 +27,15 @@ function runJson(skillDir: string, script: string, args: string[], stdin?: strin
 // ─── Skill Loader ────────────────────────────────────────────────────────────
 
 describe("Skill Loader", () => {
-  it("loads all 5 skills from the skills directory", () => {
+  it("loads all 10 skills from the skills directory", () => {
     const skills = loadAllSkills(SKILLS_DIR);
-    expect(skills.length).toBe(5);
+    expect(skills.length).toBe(10);
     const names = skills.map((s) => s.metadata.name).sort();
-    expect(names).toEqual(["csv-analytics", "data-generator", "json-transformer", "markdown-to-html", "text-processing"]);
+    expect(names).toEqual([
+      "api-mocker", "chart-generator", "csv-analytics", "data-generator",
+      "email-composer", "invoice-parser", "json-transformer", "markdown-to-html",
+      "sql-generator", "text-processing",
+    ]);
   });
 
   it("each skill has valid metadata, instructions, and at least one script", () => {
@@ -392,6 +396,283 @@ describe("Skill: data-generator", () => {
   });
 });
 
+// ─── Skill 6: Invoice Parser ────────────────────────────────────────────────
+
+describe("Skill: invoice-parser", () => {
+  const dir = join(SKILLS_DIR, "invoice-parser");
+
+  it("extracts structured fields from invoice text", () => {
+    const result = runJson(dir, "scripts/parse.ts", ["--file", join(FIXTURES, "invoice.txt")]);
+    expect(result.invoice_number).toBe("INV-2024-0892");
+    expect(result.date).toContain("01/15/2024");
+    expect(result.due_date).toContain("02/15/2024");
+    expect(result.vendor).toBeTruthy();
+    expect(result.customer).toContain("Widget");
+    expect(result.currency).toBe("USD");
+    expect(result.total).toBe(9737.88);
+    expect(result.subtotal).toBe(8975);
+    expect(result.tax_rate).toBe(8.5);
+    expect(result.payment_terms).toContain("Net 30");
+  });
+
+  it("extracts line items", () => {
+    const result = runJson(dir, "scripts/parse.ts", ["--file", join(FIXTURES, "invoice.txt")]);
+    expect(result.line_items.length).toBeGreaterThanOrEqual(2);
+    const web = result.line_items.find((li: any) => li.description.includes("Web Development"));
+    expect(web).toBeDefined();
+    expect(web.quantity).toBe(40);
+    expect(web.amount).toBe(6000);
+  });
+
+  it("handles stdin input", () => {
+    const text = "Invoice #ABC-123\nDate: 2024-03-15\nTotal: $500.00\nPayment Terms: Due on receipt";
+    const result = runJson(dir, "scripts/parse.ts", ["--stdin"], text);
+    expect(result.invoice_number).toBe("ABC-123");
+    expect(result.total).toBe(500);
+  });
+});
+
+// ─── Skill 7: Email Composer ────────────────────────────────────────────────
+
+describe("Skill: email-composer", () => {
+  const dir = join(SKILLS_DIR, "email-composer");
+
+  it("composes a follow-up email with subject and body", () => {
+    const result = runJson(dir, "scripts/compose.ts", [
+      "--type", "follow-up",
+      "--to", "Jane",
+      "--from", "John",
+      "--points", "discussed pricing,agreed on timeline",
+    ]);
+    expect(result.subject).toContain("Following up");
+    expect(result.body).toContain("Dear Jane,");
+    expect(result.body).toContain("discussed pricing");
+    expect(result.body).toContain("John");
+    expect(result.html).toContain("<div");
+  });
+
+  it("composes a cold outreach email", () => {
+    const result = runJson(dir, "scripts/compose.ts", [
+      "--type", "cold-outreach",
+      "--to", "CEO",
+      "--from", "Alice",
+      "--company", "TechCorp",
+      "--points", "saves 40% on operations,used by Fortune 500",
+      "--tone", "friendly",
+    ]);
+    expect(result.subject).toContain("TechCorp");
+    expect(result.body).toContain("TechCorp");
+    expect(result.body).toContain("saves 40%");
+  });
+
+  it("supports all email types", () => {
+    const types = ["follow-up", "cold-outreach", "meeting-recap", "escalation", "thank-you", "introduction", "reminder", "apology"];
+    for (const type of types) {
+      const result = runJson(dir, "scripts/compose.ts", [
+        "--type", type, "--to", "Bob", "--from", "Alice", "--points", "test point",
+      ]);
+      expect(result.subject).toBeTruthy();
+      expect(result.body.length).toBeGreaterThan(50);
+    }
+  });
+
+  it("reads from stdin JSON", () => {
+    const input = JSON.stringify({ type: "reminder", to: "Team", from: "Manager", points: ["Q2 report due Friday"], tone: "casual" });
+    const result = runJson(dir, "scripts/compose.ts", ["--stdin"], input);
+    expect(result.subject).toContain("reminder");
+    expect(result.body).toContain("Hi Team,");
+    expect(result.body).toContain("Q2 report due Friday");
+  });
+});
+
+// ─── Skill 8: SQL Generator ────────────────────────────────────────────────
+
+describe("Skill: sql-generator", () => {
+  const dir = join(SKILLS_DIR, "sql-generator");
+  const schemaPath = join(FIXTURES, "db-schema.json");
+
+  it("generates SELECT query from natural language", () => {
+    const result = runJson(dir, "scripts/generate.ts", [
+      "--schema", schemaPath, "--query", "find all users older than 30",
+    ]);
+    expect(result.sql).toContain("SELECT");
+    expect(result.sql).toContain("users");
+    expect(result.sql).toContain("> 30");
+    expect(result.operation).toBe("SELECT");
+    expect(result.tables_used).toContain("users");
+  });
+
+  it("generates aggregation query", () => {
+    const result = runJson(dir, "scripts/generate.ts", [
+      "--schema", schemaPath, "--query", "total amount by status for orders",
+    ]);
+    expect(result.sql).toContain("SUM");
+    expect(result.sql).toContain("GROUP BY");
+    expect(result.tables_used).toContain("orders");
+  });
+
+  it("generates sorted/limited query", () => {
+    const result = runJson(dir, "scripts/generate.ts", [
+      "--schema", schemaPath, "--query", "top 10 users sorted by name descending",
+    ]);
+    expect(result.sql).toContain("ORDER BY");
+    expect(result.sql).toContain("LIMIT 10");
+  });
+
+  it("generates CREATE TABLE from compact definition", () => {
+    const result = runJson(dir, "scripts/generate.ts", [
+      "--create-schema", "--tables", "users(id,name,email,age,created_at);products(id,name,price,stock)",
+    ]);
+    expect(result.sql).toContain("CREATE TABLE users");
+    expect(result.sql).toContain("CREATE TABLE products");
+    expect(result.sql).toContain("SERIAL PRIMARY KEY");
+    expect(result.sql).toContain("DECIMAL");
+    expect(result.operation).toBe("CREATE TABLE");
+  });
+
+  it("handles stdin JSON input", () => {
+    const input = JSON.stringify({
+      schema: { products: { columns: { id: "serial", name: "varchar", price: "decimal" } } },
+      query: "all products",
+    });
+    const result = runJson(dir, "scripts/generate.ts", ["--stdin"], input);
+    expect(result.sql).toContain("SELECT");
+    expect(result.sql).toContain("products");
+  });
+});
+
+// ─── Skill 9: API Mocker ───────────────────────────────────────────────────
+
+describe("Skill: api-mocker", () => {
+  const dir = join(SKILLS_DIR, "api-mocker");
+
+  it("generates mock list response for /users GET", () => {
+    const result = runJson(dir, "scripts/mock.ts", [
+      "response", "--endpoint", "/users", "--method", "GET", "--count", "3", "--seed", "42",
+    ]);
+    expect(result.data).toBeDefined();
+    expect(result.data.length).toBe(3);
+    expect(result.data[0].name).toBeTruthy();
+    expect(result.data[0].email).toContain("@");
+    expect(result.meta.total).toBeGreaterThanOrEqual(3);
+  });
+
+  it("generates mock single resource for /users/1 GET", () => {
+    const result = runJson(dir, "scripts/mock.ts", [
+      "response", "--endpoint", "/users/1", "--method", "GET", "--seed", "10",
+    ]);
+    expect(result.id).toBeTruthy();
+    expect(result.name).toBeTruthy();
+    expect(result.data).toBeUndefined(); // not a list
+  });
+
+  it("generates error responses for 4xx/5xx", () => {
+    const r404 = runJson(dir, "scripts/mock.ts", ["response", "--endpoint", "/x", "--status", "404"]);
+    expect(r404.status).toBe(404);
+    expect(r404.error).toBe("Not Found");
+
+    const r500 = runJson(dir, "scripts/mock.ts", ["response", "--endpoint", "/x", "--status", "500"]);
+    expect(r500.status).toBe(500);
+  });
+
+  it("generates mock POST response (created)", () => {
+    const result = runJson(dir, "scripts/mock.ts", [
+      "response", "--endpoint", "/products", "--method", "POST", "--seed", "7",
+    ]);
+    expect(result.id).toBeTruthy();
+    expect(result.message).toContain("created");
+  });
+
+  it("generates OpenAPI 3.0 spec", () => {
+    const result = runJson(dir, "scripts/mock.ts", [
+      "openapi", "--name", "Test API", "--endpoints", "/users:GET,POST;/users/{id}:GET,PUT,DELETE",
+    ]);
+    expect(result.openapi).toBe("3.0.3");
+    expect(result.info.title).toBe("Test API");
+    expect(result.paths["/users"]).toBeDefined();
+    expect(result.paths["/users"].get).toBeDefined();
+    expect(result.paths["/users"].post).toBeDefined();
+    expect(result.paths["/users/{id}"].get).toBeDefined();
+    expect(result.paths["/users/{id}"].delete).toBeDefined();
+    expect(result.paths["/users/{id}"].get.parameters[0].name).toBe("id");
+  });
+
+  it("generates CRUD endpoint definitions", () => {
+    const result = runJson(dir, "scripts/mock.ts", [
+      "endpoints", "--resources", "users,orders",
+    ]);
+    expect(result.endpoints.length).toBe(10); // 5 per resource
+    expect(result.endpoints.some((e: any) => e.path === "/users" && e.method === "GET")).toBe(true);
+    expect(result.endpoints.some((e: any) => e.path === "/orders/{id}" && e.method === "DELETE")).toBe(true);
+  });
+
+  it("seeded responses are deterministic", () => {
+    const a = runJson(dir, "scripts/mock.ts", ["response", "--endpoint", "/users", "--count", "2", "--seed", "99"]);
+    const b = runJson(dir, "scripts/mock.ts", ["response", "--endpoint", "/users", "--count", "2", "--seed", "99"]);
+    expect(a).toEqual(b);
+  });
+});
+
+// ─── Skill 10: Chart Generator ─────────────────────────────────────────────
+
+describe("Skill: chart-generator", () => {
+  const dir = join(SKILLS_DIR, "chart-generator");
+
+  it("generates a bar chart SVG", () => {
+    const svg = run(dir, "scripts/chart.ts", [
+      "bar", "--data", '{"Q1":100,"Q2":150,"Q3":200,"Q4":180}', "--title", "Revenue",
+    ]);
+    expect(svg).toContain("<svg");
+    expect(svg).toContain("</svg>");
+    expect(svg).toContain("Revenue");
+    expect(svg).toContain("<rect"); // bars
+    expect(svg).toContain("Q1");
+  });
+
+  it("generates a line chart SVG", () => {
+    const svg = run(dir, "scripts/chart.ts", [
+      "line", "--data", "[[1,10],[2,25],[3,18],[4,32]]", "--title", "Growth",
+    ]);
+    expect(svg).toContain("<svg");
+    expect(svg).toContain("<polyline");
+    expect(svg).toContain("<circle");
+    expect(svg).toContain("Growth");
+  });
+
+  it("generates a pie chart SVG with legend", () => {
+    const svg = run(dir, "scripts/chart.ts", [
+      "pie", "--data", '{"Chrome":65,"Firefox":15,"Safari":12,"Other":8}',
+    ]);
+    expect(svg).toContain("<svg");
+    expect(svg).toContain("<path"); // slices
+    expect(svg).toContain("Chrome");
+    expect(svg).toContain("65%");
+  });
+
+  it("generates a scatter plot SVG", () => {
+    const svg = run(dir, "scripts/chart.ts", [
+      "scatter", "--data", "[[1,2],[3,4],[5,1],[7,8]]",
+    ]);
+    expect(svg).toContain("<svg");
+    expect(svg).toContain("<circle");
+  });
+
+  it("reads data from stdin", () => {
+    const data = JSON.stringify({ "A": 10, "B": 20, "C": 30 });
+    const svg = run(dir, "scripts/chart.ts", ["bar", "--stdin"], data);
+    expect(svg).toContain("<svg");
+    expect(svg).toContain("A");
+  });
+
+  it("respects custom width/height", () => {
+    const svg = run(dir, "scripts/chart.ts", [
+      "bar", "--data", '{"X":1}', "--width", "800", "--height", "500",
+    ]);
+    expect(svg).toContain('width="800"');
+    expect(svg).toContain('height="500"');
+  });
+});
+
 // ─── Bundle & CLI ───────────────────────────────────────────────────────────
 
 describe("Bundle", () => {
@@ -423,7 +704,7 @@ describe("Bundle", () => {
     expect(snippet).toContain("code_execution");
   });
 
-  it("bundles all 5 skills without errors", () => {
+  it("bundles all 10 skills without errors", () => {
     const skills = loadAllSkills(SKILLS_DIR);
     for (const skill of skills) {
       const bundle = bundleSkill(skill.directory);
@@ -453,13 +734,18 @@ describe("CLI", () => {
     expect(out).toContain("bundle");
   });
 
-  it("list shows all 5 built-in skills", () => {
+  it("list shows all 10 built-in skills", () => {
     const out = runCli(["list"]);
     expect(out).toContain("csv-analytics");
     expect(out).toContain("markdown-to-html");
     expect(out).toContain("json-transformer");
     expect(out).toContain("text-processing");
     expect(out).toContain("data-generator");
+    expect(out).toContain("invoice-parser");
+    expect(out).toContain("email-composer");
+    expect(out).toContain("sql-generator");
+    expect(out).toContain("api-mocker");
+    expect(out).toContain("chart-generator");
   });
 
   it("info shows skill details", () => {

@@ -1,7 +1,7 @@
 {
   "name": "ai-skills",
   "version": "0.1.0",
-  "description": "Ready-to-use Agent Skills for the Claude API. 5 built-in skills, CLI to run/test/bundle, scaffold your own.",
+  "description": "Ready-to-use Agent Skills for the Claude API. 10 built-in skills, CLI to run/test/bundle, scaffold your own.",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "bin": {

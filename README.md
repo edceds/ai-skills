@@ -1,6 +1,6 @@
 # ai-skills
 
-Ready-to-use [Agent Skills](https://platform.claude.com/docs/en/agents-and-tools/agent-skills/overview) for the Claude API. 5 built-in skills, a CLI to run/test/bundle them, and a scaffolder to create your own.
+Ready-to-use [Agent Skills](https://platform.claude.com/docs/en/agents-and-tools/agent-skills/overview) for the Claude API. 10 built-in skills, a CLI to run/test/bundle them, and a scaffolder to create your own.
 
 ```bash
 npx ai-skills list
@@ -22,13 +22,25 @@ npx ai-skills --help
 
 ## Built-in Skills
 
+### Data & Documents
+
 | Skill | What it does |
 |-------|-------------|
 | **csv-analytics** | Parse CSV, compute stats (mean/median/stddev), filter rows, aggregate/group-by |
-| **markdown-to-html** | Convert Markdown to styled standalone HTML (headings, tables, code blocks, themes) |
 | **json-transformer** | Validate against schemas, query by dot-path, flatten/unflatten, diff, pick fields |
+| **markdown-to-html** | Convert Markdown to styled standalone HTML (headings, tables, code blocks, themes) |
 | **text-processing** | Readability scores (Flesch-Kincaid, Coleman-Liau, ARI), keywords, word frequency, extractive summarization |
 | **data-generator** | Generate mock users, products, time series, or custom schemas with deterministic seeding |
+
+### Agent Building Blocks
+
+| Skill | What it does |
+|-------|-------------|
+| **invoice-parser** | Extract structured data from invoices/receipts — line items, totals, tax, vendor, dates |
+| **email-composer** | Generate professional emails from intent + bullet points (follow-up, outreach, recap, escalation, 8 types) |
+| **sql-generator** | Natural language to SQL queries given a database schema (SELECT, CREATE TABLE, aggregations) |
+| **api-mocker** | Generate mock API responses, OpenAPI 3.0 specs, and CRUD endpoint definitions |
+| **chart-generator** | Data to SVG charts — bar, line, pie, scatter plots with customizable colors and dimensions |
 
 Each skill follows the [Anthropic Agent Skill format](https://platform.claude.com/docs/en/agents-and-tools/agent-skills/overview): a `SKILL.md` with YAML frontmatter + executable scripts.
 
@@ -59,6 +71,21 @@ npx ai-skills run json-transformer query --file data.json --path "users[0].addre
 
 # Extract keywords
 npx ai-skills run text-processing keywords --file article.txt --top 10
+
+# Parse an invoice
+npx ai-skills run invoice-parser --file invoice.txt
+
+# Draft an email
+npx ai-skills run email-composer --type follow-up --to "Jane" --from "John" --points "pricing,timeline"
+
+# Generate SQL from natural language
+npx ai-skills run sql-generator --schema schema.json --query "users older than 30 sorted by name"
+
+# Mock API response
+npx ai-skills run api-mocker response --endpoint "/users" --method GET --count 5
+
+# Generate a bar chart
+npx ai-skills run chart-generator bar --data '{"Q1":100,"Q2":150,"Q3":200}'
 ```
 
 ### Create your own skill

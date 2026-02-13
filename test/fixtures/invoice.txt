@@ -1,0 +1,24 @@
+Acme Corporation
+123 Business Ave, Suite 400
+New York, NY 10001
+
+Invoice #INV-2024-0892
+Date: 01/15/2024
+Due Date: 02/15/2024
+
+Bill To: Widget Industries
+456 Commerce St
+Chicago, IL 60601
+
+Description                    Qty    Unit Price    Amount
+Web Development Services        40      $150.00    $6,000.00
+UI/UX Design                    20      $120.00    $2,400.00
+Cloud Hosting (Annual)           1      $500.00      $500.00
+SSL Certificate                  1       $75.00       $75.00
+
+Subtotal:  $8,975.00
+Tax (8.5%):   $762.88
+Total:     $9,737.88
+
+Payment Terms: Net 30
+Notes: Thank you for your business!
