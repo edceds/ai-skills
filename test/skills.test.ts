@@ -1,9 +1,10 @@
 import { describe, it, expect } from "vitest";
 import { execFileSync } from "node:child_process";
 import { join } from "node:path";
-import { existsSync, rmSync } from "node:fs";
+import { existsSync, rmSync, readFileSync } from "node:fs";
 import { loadSkill, loadAllSkills } from "../src/loader.js";
 import { bundleSkill, generateUploadCurl, generateUsageSnippet } from "../src/bundle.js";
+import { skills } from "../src/agent.js";
 
 const SKILLS_DIR = join(__dirname, "..", "skills");
 const FIXTURES = join(__dirname, "fixtures");
@@ -18,6 +19,83 @@ function run(skillDir: string, script: string, args: string[], stdin?: string): 
 function runJson(skillDir: string, script: string, args: string[], stdin?: string): any {
   return JSON.parse(run(skillDir, script, args, stdin));
 }
+
+// ─── skills.* API (the easy way) ─────────────────────────────────────────────
+
+describe("skills API", () => {
+  it("skills.parseInvoice() returns structured invoice data", () => {
+    const text = readFileSync(join(FIXTURES, "invoice.txt"), "utf-8");
+    const result = skills.parseInvoice({ text });
+    expect(result.invoice_number).toBe("INV-2024-0892");
+    expect(result.total).toBe(9737.88);
+    expect(result.line_items.length).toBeGreaterThanOrEqual(2);
+    expect(result.currency).toBe("USD");
+  });
+
+  it("skills.composeEmail() returns subject + body + html", () => {
+    const result = skills.composeEmail({
+      type: "follow-up",
+      to: "Jane",
+      from: "John",
+      points: ["discussed pricing", "agreed on timeline"],
+    });
+    expect(result.subject).toContain("Following up");
+    expect(result.body).toContain("Dear Jane,");
+    expect(result.body).toContain("discussed pricing");
+    expect(result.html).toContain("<div");
+  });
+
+  it("skills.generateSql() returns SQL from natural language", () => {
+    const result = skills.generateSql({
+      schema: {
+        users: { columns: { id: "serial", name: "varchar", age: "int" }, primary_key: "id" },
+      },
+      query: "users older than 30 sorted by name",
+    });
+    expect(result.sql).toContain("SELECT");
+    expect(result.sql).toContain("> 30");
+    expect(result.sql).toContain("ORDER BY");
+    expect(result.operation).toBe("SELECT");
+  });
+
+  it("skills.createTable() returns CREATE TABLE SQL", () => {
+    const result = skills.createTable({ tables: "users(id,name,email)" });
+    expect(result.sql).toContain("CREATE TABLE users");
+    expect(result.operation).toBe("CREATE TABLE");
+  });
+
+  it("skills.mockApiResponse() returns mock data for an endpoint", () => {
+    const result = skills.mockApiResponse({ endpoint: "/users", method: "GET", count: 3, seed: 42 });
+    expect(result.data.length).toBe(3);
+    expect(result.data[0].name).toBeTruthy();
+    expect(result.meta.total).toBeGreaterThanOrEqual(3);
+  });
+
+  it("skills.mockOpenApi() returns an OpenAPI spec", () => {
+    const result = skills.mockOpenApi({
+      name: "Test API",
+      endpoints: "/users:GET,POST;/users/{id}:GET,DELETE",
+    });
+    expect(result.openapi).toBe("3.0.3");
+    expect(result.paths["/users"].get).toBeDefined();
+  });
+
+  it("skills.mockEndpoints() returns CRUD definitions", () => {
+    const result = skills.mockEndpoints({ resources: ["users", "orders"] });
+    expect(result.endpoints.length).toBe(10);
+  });
+
+  it("skills.generateChart() returns SVG string", () => {
+    const svg = skills.generateChart({
+      type: "bar",
+      data: { "Q1": 100, "Q2": 200, "Q3": 150 },
+      title: "Revenue",
+    });
+    expect(svg).toContain("<svg");
+    expect(svg).toContain("Revenue");
+    expect(svg).toContain("Q1");
+  });
+});
 
 // ─── Skill Loader ────────────────────────────────────────────────────────────
 

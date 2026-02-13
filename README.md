@@ -1,16 +1,36 @@
 # ai-skills
 
-Production-ready [Agent Skills](https://platform.claude.com/docs/en/agents-and-tools/agent-skills/overview) for the Claude API. Each skill gives your agent a real business capability — parse invoices, draft emails, query databases, prototype APIs, generate charts.
+Production-ready [Agent Skills](https://platform.claude.com/docs/en/agents-and-tools/agent-skills/overview) for the Claude API. One function call per capability.
 
-```bash
-npx ai-skills list
-npx ai-skills run invoice-parser --file invoice.txt
-npx ai-skills bundle email-composer
+```typescript
+import { skills } from "ai-skills";
+
+// Parse an invoice
+const invoice = skills.parseInvoice({ text: invoiceText });
+// → { invoice_number, total, line_items, tax_rate, vendor, ... }
+
+// Draft an email
+const email = skills.composeEmail({
+  type: "follow-up", to: "Jane", from: "John",
+  points: ["discussed pricing", "agreed on Q2 timeline"],
+});
+// → { subject, body, html }
+
+// Generate SQL from English
+const query = skills.generateSql({
+  schema: { users: { columns: { id: "serial", name: "varchar", age: "int" } } },
+  query: "users older than 30 sorted by name",
+});
+// → { sql: "SELECT users.* FROM users WHERE users.age > 30 ORDER BY ...", ... }
+
+// Mock an API response
+const mock = skills.mockApiResponse({ endpoint: "/users", method: "GET", count: 5 });
+// → { data: [...], meta: { total, page, per_page } }
+
+// Generate a chart
+const svg = skills.generateChart({ type: "bar", data: { Q1: 100, Q2: 200 }, title: "Revenue" });
+// → "<svg>...</svg>"
 ```
-
-## Why this exists
-
-AI agents are only as useful as the tasks they can actually do. Right now every team building on Claude is writing the same boilerplate skills from scratch — invoice parsing, email drafting, SQL generation. This package ships those skills ready to use: install, bundle, upload to Claude, done.
 
 ## Install
 
@@ -18,65 +38,31 @@ AI agents are only as useful as the tasks they can actually do. Right now every 
 npm install ai-skills
 ```
 
-Or run directly:
-
-```bash
-npx ai-skills --help
-```
-
 ## Skills
 
-| Skill | What your agent can do |
-|-------|----------------------|
-| **invoice-parser** | Extract structured data from invoices — line items, totals, tax, vendor, dates, payment terms |
-| **email-composer** | Draft professional emails from intent + bullet points (8 types: follow-up, outreach, recap, escalation, thank-you, intro, reminder, apology) |
-| **sql-generator** | Turn natural language into SQL queries given a database schema (SELECT, CREATE TABLE, aggregations, multi-dialect) |
-| **api-mocker** | Generate mock API responses, OpenAPI 3.0 specs, and CRUD endpoint definitions from resource names |
-| **chart-generator** | Turn data into SVG charts — bar, line, pie, scatter — self-contained, no external deps |
+| Function | What it does |
+|----------|-------------|
+| `skills.parseInvoice({ text })` | Extract structured data from invoices — line items, totals, tax, vendor, dates, payment terms |
+| `skills.composeEmail({ type, to, from, points })` | Draft professional emails (8 types: follow-up, outreach, recap, escalation, thank-you, intro, reminder, apology) |
+| `skills.generateSql({ schema, query })` | Natural language to SQL (SELECT, WHERE, GROUP BY, ORDER BY, LIMIT, multi-dialect) |
+| `skills.createTable({ tables })` | Generate CREATE TABLE from compact definitions |
+| `skills.mockApiResponse({ endpoint, method })` | Mock JSON responses with realistic data for any REST endpoint |
+| `skills.mockOpenApi({ name, endpoints })` | Generate OpenAPI 3.0 specs |
+| `skills.mockEndpoints({ resources })` | Generate CRUD endpoint definitions from resource names |
+| `skills.generateChart({ type, data })` | Data to SVG charts — bar, line, pie, scatter |
 
-Each skill follows the [Anthropic Agent Skill format](https://platform.claude.com/docs/en/agents-and-tools/agent-skills/overview): `SKILL.md` with YAML frontmatter + executable scripts in `scripts/`.
+All functions are synchronous, zero external dependencies, fully typed.
 
-## CLI
+## Upload to Claude API
 
-```
-ai-skills list                         List available skills
-ai-skills info  <skill>                Show skill details + instructions
-ai-skills run   <skill> [args...]      Run a skill locally
-ai-skills init  <name>                 Scaffold a new skill
-ai-skills bundle <skill> [--out dir]   Bundle for Anthropic upload
-```
-
-### Examples
+Every skill also works as an [Anthropic Agent Skill](https://platform.claude.com/docs/en/agents-and-tools/agent-skills/overview) — a directory with `SKILL.md` + scripts that Claude can use in its code execution container.
 
 ```bash
-# Parse an invoice into structured JSON
-npx ai-skills run invoice-parser --file invoice.txt
-
-# Draft a follow-up email
-npx ai-skills run email-composer --type follow-up --to "Jane" --from "John" --points "pricing,timeline"
-
-# Generate SQL from English
-npx ai-skills run sql-generator --schema schema.json --query "users older than 30 sorted by name"
-
-# Mock an API response
-npx ai-skills run api-mocker response --endpoint "/users" --method GET --count 5
-
-# Generate a bar chart
-npx ai-skills run chart-generator bar --data '{"Q1":100,"Q2":150,"Q3":200}'
+# Bundle a skill for upload
+npx ai-skills bundle invoice-parser
 ```
 
-### Create your own skill
-
-```bash
-npx ai-skills init my-custom-skill
-# Edit skills/my-custom-skill/SKILL.md + scripts/main.ts
-npx ai-skills run my-custom-skill --help
-npx ai-skills bundle my-custom-skill
-```
-
-## Upload to Claude
-
-`ai-skills bundle <skill>` gives you the upload code:
+This gives you the upload code:
 
 ```python
 import anthropic
@@ -88,16 +74,12 @@ skill = client.beta.skills.create(
     files=files_from_dir("./skills/invoice-parser"),
     betas=["skills-2025-10-02"],
 )
-print(f"Created: {skill.id}")
 ```
 
 Then use it in your agent:
 
 ```typescript
-import Anthropic from "@anthropic-ai/sdk";
-
-const client = new Anthropic();
-const response = await client.beta.messages.create({
+const response = await anthropic.beta.messages.create({
   model: "claude-sonnet-4-20250514",
   max_tokens: 4096,
   betas: ["code-execution-2025-08-25", "skills-2025-10-02"],
@@ -109,31 +91,40 @@ const response = await client.beta.messages.create({
 });
 ```
 
-## Programmatic API
+## CLI
 
-```typescript
-import { loadSkill, loadAllSkills, runScript, bundleSkill } from "ai-skills";
+```bash
+npx ai-skills list                    # List available skills
+npx ai-skills info  <skill>           # Show skill details
+npx ai-skills run   <skill> [args]    # Run a skill locally
+npx ai-skills init  <name>            # Scaffold a new skill
+npx ai-skills bundle <skill>          # Bundle for Anthropic upload
+```
 
-const skill = loadSkill("./skills/invoice-parser");
-const result = runScript(skill, "scripts/parse.ts", ["--file", "invoice.txt"]);
-console.log(JSON.parse(result.stdout));
+## Create your own skill
 
-const bundle = bundleSkill("./skills/invoice-parser");
-// bundle.files → [{ path, content, mime }, ...]
+```bash
+npx ai-skills init my-custom-skill
+# Creates skills/my-custom-skill/SKILL.md + scripts/main.ts
+```
+
+Each skill is a directory:
+
+```
+my-skill/
+├── SKILL.md          # YAML frontmatter (name, description) + instructions
+└── scripts/
+    └── main.ts       # Executable script Claude runs
 ```
 
 ## Roadmap
 
-This is the starting point. The goal is a growing library of production-quality agent skills that cover the workflows businesses actually automate.
-
-Planned next:
+Planned skills:
 - **contract-analyzer** — extract clauses, obligations, dates from legal docs
 - **spreadsheet-builder** — generate Excel/CSV reports from structured data
 - **calendar-scheduler** — parse availability, suggest meeting times, generate .ics
 - **webhook-handler** — parse and route incoming webhook payloads (Stripe, GitHub, Slack)
 - **pdf-report** — generate formatted PDF reports from data + templates
-
-Contributions welcome. Each skill is a standalone directory — fork, add yours, open a PR.
 
 ## License
 
