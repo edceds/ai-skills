@@ -1,0 +1,24 @@
+{
+  "name": "ai-skills",
+  "version": "1.0.0",
+  "description": "Anthropic Agent Skills — 5 custom skills with loader, runner, and tests",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc",
+    "test": "vitest run"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/edceds/ai-skills.git"
+  },
+  "keywords": ["anthropic", "agent-skills", "claude"],
+  "author": "",
+  "license": "ISC",
+  "devDependencies": {
+    "@types/node": "^22.15.21",
+    "tsx": "^4.19.4",
+    "typescript": "^5.8.3",
+    "vitest": "^3.2.1"
+  }
+}
