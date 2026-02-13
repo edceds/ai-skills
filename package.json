@@ -1,7 +1,7 @@
 {
   "name": "ai-skills",
-  "version": "0.1.0",
-  "description": "Artifact-producing Agent Skills — QR codes, PDFs, spreadsheets, calendars, charts. MCP server for instant agent access.",
+  "version": "0.2.0",
+  "description": "Artifact-producing skills for AI agents. MCP server with 10 tools: QR codes, PDFs, spreadsheets, calendars, charts, vCards, barcodes, WAV audio, hashes, ZIP archives.",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "bin": {
@@ -15,8 +15,7 @@
   ],
   "scripts": {
     "build": "tsc",
-    "test": "vitest run",
-    "cli": "npx tsx src/cli.ts"
+    "test": "vitest run"
   },
   "repository": {
     "type": "git",
