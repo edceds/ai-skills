@@ -83,11 +83,11 @@ describe("MCP server", () => {
 // ─── Loader ──────────────────────────────────────────────────────────────────
 
 describe("Skill Loader", () => {
-  it("loads all 5 skills", () => {
+  it("loads all 6 skills (5 artifact + 1 guide)", () => {
     const s = loadAllSkills(SKILLS_DIR);
-    expect(s.length).toBe(5);
+    expect(s.length).toBe(6);
     expect(s.map((s) => s.metadata.name).sort()).toEqual([
-      "chart-generator", "ical-generator", "pdf-builder", "qr-code", "spreadsheet-builder",
+      "ai-skills-guide", "chart-generator", "ical-generator", "pdf-builder", "qr-code", "spreadsheet-builder",
     ]);
   });
 
@@ -316,7 +316,7 @@ describe("Skill: ical-generator", () => {
 // ─── Bundle ──────────────────────────────────────────────────────────────────
 
 describe("Bundle", () => {
-  it("bundles all 5 skills", () => {
+  it("bundles all skills", () => {
     for (const skill of loadAllSkills(SKILLS_DIR)) {
       const bundle = bundleSkill(skill.directory);
       expect(bundle.files.length).toBeGreaterThanOrEqual(2);
@@ -335,13 +335,14 @@ describe("CLI", () => {
     });
   }
 
-  it("list shows all 5 skills", () => {
+  it("list shows all skills", () => {
     const out = runCli(["list"]);
     expect(out).toContain("chart-generator");
     expect(out).toContain("qr-code");
     expect(out).toContain("pdf-builder");
     expect(out).toContain("spreadsheet-builder");
     expect(out).toContain("ical-generator");
+    expect(out).toContain("ai-skills-guide");
   });
 
   it("init scaffolds a new skill", () => {
@@ -360,6 +361,57 @@ describe("CLI", () => {
     const out = runCli(["bundle", "qr-code"]);
     expect(out).toContain("SKILL.md");
     expect(out).toContain("skills.create");
+  });
+});
+
+// ─── ai-skills-guide (meta-skill) ────────────────────────────────────────────
+
+describe("Skill: ai-skills-guide", () => {
+  const guide = join(SKILLS_DIR, "ai-skills-guide", "scripts", "run.ts");
+
+  function runGuide(args: string[]): string {
+    return execFileSync("npx", ["tsx", guide, ...args], {
+      cwd: ROOT, encoding: "utf-8", timeout: 30_000,
+    });
+  }
+
+  it("lists available skills", () => {
+    const out = runGuide(["list"]);
+    expect(out).toContain("qr-code");
+    expect(out).toContain("pdf-builder");
+    expect(out).toContain("chart-generator");
+    expect(out).toContain("spreadsheet-builder");
+    expect(out).toContain("ical-generator");
+  });
+
+  it("runs qr-code with JSON input", () => {
+    const svg = runGuide(["qr-code", '{"data":"hello"}']);
+    expect(svg).toContain("<svg");
+    expect(svg).toContain("<rect");
+  });
+
+  it("runs pdf-builder with JSON input", () => {
+    const json = JSON.parse(runGuide(["pdf-builder", '{"title":"Test","body":["Hello."]}']));
+    expect(json.base64).toBeTruthy();
+    expect(json.pages).toBe(1);
+  });
+
+  it("runs spreadsheet-builder with JSON input", () => {
+    const csv = runGuide(["spreadsheet-builder", '{"headers":["A","B"],"rows":[["1","2"]]}']);
+    expect(csv).toContain("A,B");
+    expect(csv).toContain("1,2");
+  });
+
+  it("runs chart-generator with JSON input", () => {
+    const svg = runGuide(["chart-generator", '{"type":"pie","data":{"X":60,"Y":40}}']);
+    expect(svg).toContain("<svg");
+    expect(svg).toContain("<path");
+  });
+
+  it("runs ical-generator with JSON input", () => {
+    const ics = runGuide(["ical-generator", '{"events":[{"summary":"Test","start":"2025-03-15T14:00:00","end":"2025-03-15T15:00:00"}]}']);
+    expect(ics).toContain("BEGIN:VCALENDAR");
+    expect(ics).toContain("SUMMARY:Test");
   });
 });
 
