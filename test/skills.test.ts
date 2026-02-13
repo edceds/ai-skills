@@ -1,7 +1,9 @@
 import { describe, it, expect } from "vitest";
 import { execFileSync } from "node:child_process";
 import { join } from "node:path";
+import { existsSync, rmSync } from "node:fs";
 import { loadSkill, loadAllSkills } from "../src/loader.js";
+import { bundleSkill, generateUploadCurl, generateUsageSnippet } from "../src/bundle.js";
 
 const SKILLS_DIR = join(__dirname, "..", "skills");
 const FIXTURES = join(__dirname, "fixtures");
@@ -387,5 +389,114 @@ describe("Skill: data-generator", () => {
     expect(lines[0]).toContain("name");
     expect(lines[0]).toContain("email");
     expect(lines[0]).toContain("age");
+  });
+});
+
+// ─── Bundle & CLI ───────────────────────────────────────────────────────────
+
+describe("Bundle", () => {
+  it("bundles a skill with correct file structure", () => {
+    const bundle = bundleSkill(join(SKILLS_DIR, "csv-analytics"));
+    expect(bundle.display_title).toBe("Csv Analytics");
+    expect(bundle.files.length).toBeGreaterThanOrEqual(2); // SKILL.md + at least 1 script
+    expect(bundle.files[0].path).toBe("csv-analytics/SKILL.md");
+    expect(bundle.files[0].mime).toBe("text/markdown");
+    expect(bundle.files[0].content).toContain("---");
+    const scriptFile = bundle.files.find((f) => f.path.includes("scripts/"));
+    expect(scriptFile).toBeDefined();
+    expect(scriptFile!.mime).toBe("text/x-typescript");
+  });
+
+  it("generates Anthropic upload snippet", () => {
+    const bundle = bundleSkill(join(SKILLS_DIR, "json-transformer"));
+    const snippet = generateUploadCurl(bundle);
+    expect(snippet).toContain("anthropic");
+    expect(snippet).toContain("skills.create");
+    expect(snippet).toContain("Json Transformer");
+  });
+
+  it("generates usage snippet with skill ID placeholder", () => {
+    const bundle = bundleSkill(join(SKILLS_DIR, "text-processing"));
+    const snippet = generateUsageSnippet(bundle);
+    expect(snippet).toContain("@anthropic-ai/sdk");
+    expect(snippet).toContain("skills-2025-10-02");
+    expect(snippet).toContain("code_execution");
+  });
+
+  it("bundles all 5 skills without errors", () => {
+    const skills = loadAllSkills(SKILLS_DIR);
+    for (const skill of skills) {
+      const bundle = bundleSkill(skill.directory);
+      expect(bundle.files.length).toBeGreaterThanOrEqual(2);
+      expect(bundle.files[0].path).toContain("SKILL.md");
+    }
+  });
+});
+
+describe("CLI", () => {
+  const cli = join(__dirname, "..", "src", "cli.ts");
+
+  function runCli(args: string[]): string {
+    return execFileSync("npx", ["tsx", cli, ...args], {
+      cwd: join(__dirname, ".."),
+      encoding: "utf-8",
+      timeout: 30_000,
+    });
+  }
+
+  it("--help shows usage", () => {
+    const out = runCli(["--help"]);
+    expect(out).toContain("ai-skills");
+    expect(out).toContain("list");
+    expect(out).toContain("run");
+    expect(out).toContain("init");
+    expect(out).toContain("bundle");
+  });
+
+  it("list shows all 5 built-in skills", () => {
+    const out = runCli(["list"]);
+    expect(out).toContain("csv-analytics");
+    expect(out).toContain("markdown-to-html");
+    expect(out).toContain("json-transformer");
+    expect(out).toContain("text-processing");
+    expect(out).toContain("data-generator");
+  });
+
+  it("info shows skill details", () => {
+    const out = runCli(["info", "csv-analytics"]);
+    expect(out).toContain("csv-analytics");
+    expect(out).toContain("scripts/analyze.ts");
+    expect(out).toContain("Quick start");
+  });
+
+  it("run executes a skill script", () => {
+    const out = runCli(["run", "data-generator", "users", "--count", "2", "--seed", "42"]);
+    const data = JSON.parse(out);
+    expect(data.length).toBe(2);
+    expect(data[0].name).toBeTruthy();
+  });
+
+  it("init scaffolds a new skill", () => {
+    const testSkillDir = join(__dirname, "..", "skills", "test-scaffold-tmp");
+    try {
+      const out = runCli(["init", "test-scaffold-tmp"]);
+      expect(out).toContain("Created");
+      expect(existsSync(join(testSkillDir, "SKILL.md"))).toBe(true);
+      expect(existsSync(join(testSkillDir, "scripts", "main.ts"))).toBe(true);
+
+      // The scaffolded skill should be loadable
+      const skill = loadSkill(testSkillDir);
+      expect(skill.metadata.name).toBe("test-scaffold-tmp");
+    } finally {
+      if (existsSync(testSkillDir)) rmSync(testSkillDir, { recursive: true });
+    }
+  });
+
+  it("bundle shows file listing and upload snippet", () => {
+    const out = runCli(["bundle", "csv-analytics"]);
+    expect(out).toContain("Csv Analytics");
+    expect(out).toContain("SKILL.md");
+    expect(out).toContain("anthropic");
+    expect(out).toContain("skills.create");
   });
 });

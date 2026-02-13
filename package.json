@@ -1,21 +1,37 @@
 {
   "name": "ai-skills",
-  "version": "1.0.0",
-  "description": "Agent Skill Marketplace — registry, discovery, delegation, billing, and workflows for the agent-to-agent economy",
+  "version": "0.1.0",
+  "description": "Ready-to-use Agent Skills for the Claude API. 5 built-in skills, CLI to run/test/bundle, scaffold your own.",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
+  "bin": {
+    "ai-skills": "dist/cli.js"
+  },
+  "files": [
+    "dist",
+    "skills"
+  ],
   "scripts": {
     "build": "tsc",
-    "start": "npx tsx src/server.ts",
-    "test": "vitest run"
+    "test": "vitest run",
+    "cli": "npx tsx src/cli.ts"
   },
   "repository": {
     "type": "git",
     "url": "git+https://github.com/edceds/ai-skills.git"
   },
-  "keywords": ["anthropic", "agent-skills", "claude"],
+  "keywords": [
+    "anthropic",
+    "claude",
+    "agent-skills",
+    "ai-agent",
+    "skills",
+    "claude-api",
+    "agent",
+    "llm-tools"
+  ],
   "author": "",
-  "license": "ISC",
+  "license": "MIT",
   "devDependencies": {
     "@types/node": "^22.15.21",
     "tsx": "^4.19.4",
