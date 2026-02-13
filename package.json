@@ -10,8 +10,8 @@
   "files": [
     "dist",
     "skills",
-    "llms.txt",
-    "llms-full.txt"
+    "scripts",
+    "SKILL.md"
   ],
   "scripts": {
     "build": "tsc",

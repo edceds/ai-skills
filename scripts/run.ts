@@ -1,8 +1,9 @@
-import { readFileSync, readdirSync, existsSync, writeFileSync } from "node:fs";
+import { readFileSync, readdirSync, existsSync } from "node:fs";
 import { execFileSync } from "node:child_process";
 import { join, dirname } from "node:path";
 
-const SKILLS_DIR = join(dirname(dirname(__dirname)));
+const ROOT = join(dirname(__dirname));
+const SKILLS_DIR = join(ROOT, "skills");
 
 function usage() {
   console.log(`Usage: run.ts <skill> <json-input>
@@ -28,7 +29,7 @@ Examples:
 
 function listSkills() {
   const dirs = readdirSync(SKILLS_DIR, { withFileTypes: true })
-    .filter(d => d.isDirectory() && d.name !== "ai-skills-guide" && existsSync(join(SKILLS_DIR, d.name, "SKILL.md")));
+    .filter(d => d.isDirectory() && existsSync(join(SKILLS_DIR, d.name, "SKILL.md")));
   for (const d of dirs) {
     const md = readFileSync(join(SKILLS_DIR, d.name, "SKILL.md"), "utf-8");
     const desc = md.match(/^description:\s*(.+)$/m)?.[1]?.trim() ?? "";
@@ -128,7 +129,6 @@ function main() {
     process.exit(1);
   }
 
-  // Read JSON input from arg or stdin
   let jsonStr: string;
   if (args[1] === "--stdin") {
     jsonStr = readFileSync(0, "utf-8");
