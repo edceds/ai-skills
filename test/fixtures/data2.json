@@ -1,8 +1,0 @@
-{
-  "users": [
-    { "id": 1, "name": "Alice", "email": "alice@new.com", "address": { "city": "NYC", "zip": "10001" } },
-    { "id": 2, "name": "Bob", "email": "bob@test.com", "address": { "city": "LA", "zip": "90001" } }
-  ],
-  "meta": { "version": 3, "count": 2 },
-  "tags": ["updated"]
-}
