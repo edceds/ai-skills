@@ -1,11 +1,12 @@
 {
   "name": "ai-skills",
   "version": "1.0.0",
-  "description": "Anthropic Agent Skills — 5 custom skills with loader, runner, and tests",
+  "description": "Agent Skill Marketplace — registry, discovery, delegation, billing, and workflows for the agent-to-agent economy",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "scripts": {
     "build": "tsc",
+    "start": "npx tsx src/server.ts",
     "test": "vitest run"
   },
   "repository": {
