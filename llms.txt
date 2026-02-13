@@ -1,6 +1,6 @@
 # ai-skills
 
-> Artifact-producing skills for AI agents. Generates files that LLMs cannot produce from their token stream: QR codes (SVG), PDFs, spreadsheets (CSV/TSV), iCalendar (.ics), and charts (SVG). Zero external dependencies. Ships as an MCP server, npm library, and Anthropic Agent Skills.
+> Artifact-producing skills for AI agents. Generates files that LLMs cannot produce from their token stream: QR codes (SVG), PDFs, spreadsheets (CSV/TSV), iCalendar (.ics), and charts (SVG). Zero external dependencies.
 
 ## Use instantly (MCP)
 
@@ -30,13 +30,12 @@ skills.generateChart({ type: "bar", data: { Q1: 100, Q2: 200 } }) // → SVG str
 
 ## Skills
 
-- `generateQrCode({ data, size?, ecl?, fg?, bg? })` → SVG. Pixel-precise 2D barcode encoding.
-- `buildPdf({ title?, author?, date?, body, footer?, pageSize? })` → `{ base64, size, pages }`. Binary PDF with object trees.
-- `buildSpreadsheet({ headers, rows, summary?, format?, formulas?, bom? })` → CSV/TSV string. RFC 4180 escaping + formulas.
-- `generateIcal({ events, calendar_name?, method? })` → .ics string. RFC 5545 with recurrence, timezones, attendees, alarms.
-- `generateChart({ type, data, title?, width?, height?, colors? })` → SVG. Bar, line, pie, scatter charts.
+- `generateQrCode({ data, size?, ecl?, fg?, bg? })` → SVG
+- `buildPdf({ title?, author?, date?, body, footer?, pageSize? })` → `{ base64, size, pages }`
+- `buildSpreadsheet({ headers, rows, summary?, format?, formulas?, bom? })` → CSV/TSV string
+- `generateIcal({ events, calendar_name?, method? })` → .ics string
+- `generateChart({ type, data, title?, width?, height?, colors? })` → SVG
 
-## Full docs
+## Full API reference
 
-- [Full API reference](https://github.com/edceds/ai-skills/blob/main/llms-full.txt)
-- [README](https://github.com/edceds/ai-skills/blob/main/README.md)
+- [llms-full.txt](https://github.com/edceds/ai-skills/blob/main/llms-full.txt)

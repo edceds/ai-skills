@@ -3,7 +3,7 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { z } from "zod";
-import { skills } from "./agent.js";
+import { skills } from "./index.js";
 
 export function createMcpServer(): McpServer {
   const server = new McpServer({

@@ -2,9 +2,7 @@
 
 import { join, resolve } from "node:path";
 import { existsSync, mkdirSync, writeFileSync } from "node:fs";
-import { loadSkill, loadAllSkills } from "./loader.js";
-import { runScript } from "./runner.js";
-import { bundleSkill, generateUploadCurl, generateUsageSnippet } from "./bundle.js";
+import { loadSkill, loadAllSkills, runScript, bundleSkill, generateUploadCurl, generateUsageSnippet } from "./index.js";
 
 const BUILT_IN_SKILLS = join(__dirname, "..", "skills");
 

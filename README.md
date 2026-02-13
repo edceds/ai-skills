@@ -1,75 +1,22 @@
 # ai-skills
 
-[Agent Skills](https://platform.claude.com/docs/en/agents-and-tools/agent-skills/overview) that produce artifacts AI models can't generate from text alone. Ships as an MCP server — any agent can use all skills instantly.
+Artifact-producing [Agent Skills](https://platform.claude.com/docs/en/agents-and-tools/agent-skills/overview) for things AI models can't generate from their token stream: QR codes, PDFs, spreadsheets, calendars, charts. Zero external dependencies.
 
-## Agent-first access
+> Anthropic has built-in skills for `xlsx`, `pptx`, `pdf`, `docx`. This repo covers what they don't: QR encoding, iCalendar (RFC 5545), CSV/TSV with formulas, and SVG chart rendering. All skills also work via MCP or as an npm library — outside Anthropic's container.
 
-This repo is designed to be used by AI agents, not just humans. Three ways an agent can start using skills immediately:
+## Use it
 
-**1. Share the repo URL** — send `https://github.com/edceds/ai-skills` in a chat. The agent reads [`llms.txt`](https://github.com/edceds/ai-skills/blob/main/llms.txt) and knows every skill, its inputs, and how to call it. Full API reference in [`llms-full.txt`](https://github.com/edceds/ai-skills/blob/main/llms-full.txt).
+**Agent reads your link** — share `https://github.com/edceds/ai-skills` in a chat. The agent reads [`llms.txt`](llms.txt) and knows every skill, its inputs, and how to call it. Follows the [llmstxt.org](https://llmstxt.org/) convention.
 
-**2. MCP server (zero config)** — add `{ "command": "npx", "args": ["ai-skills", "serve"] }` to any MCP-compatible agent. The agent discovers all 5 tools automatically.
-
-**3. npm library** — `npm install ai-skills` and `import { skills } from "ai-skills"` in any code execution environment.
-
-The `llms.txt` file follows the [llmstxt.org](https://llmstxt.org/) convention — a machine-readable project overview that any LLM can parse on first contact. If you're building an agent or operator that consumes tools from GitHub repos, point it at the `llms.txt` URL and it has everything it needs.
-
-## Use with any agent (MCP)
-
-Add to **Claude Desktop** (`claude_desktop_config.json`):
+**MCP server** — add to Claude Desktop, Cursor, or any MCP-compatible agent:
 
 ```json
-{
-  "mcpServers": {
-    "ai-skills": {
-      "command": "npx",
-      "args": ["ai-skills", "serve"]
-    }
-  }
-}
+{ "command": "npx", "args": ["ai-skills", "serve"] }
 ```
 
-Add to **Cursor** (Settings → MCP Servers):
+The agent gets 5 tools (`generate_qr_code`, `build_pdf`, `build_spreadsheet`, `generate_ical`, `generate_chart`) and uses them automatically.
 
-```json
-{
-  "ai-skills": {
-    "command": "npx",
-    "args": ["ai-skills", "serve"]
-  }
-}
-```
-
-That's it. The agent now has 5 tools: `generate_qr_code`, `build_pdf`, `build_spreadsheet`, `generate_ical`, `generate_chart`. It discovers and uses them automatically when relevant.
-
-## The rule
-
-**A skill belongs here if and only if it produces an output that an AI model cannot reliably generate from its text/token stream.**
-
-This means:
-
-| Belongs here | Does NOT belong here |
-|-------------|---------------------|
-| Binary/structured file formats (PDF, XLSX) | Text analysis (summarization, sentiment) |
-| Visual output (SVG charts, QR codes, barcodes) | Text generation (emails, SQL, code) |
-| Strict-spec formats where one wrong byte = broken (iCal, vCard) | JSON/text transformation (parsing, querying) |
-| Deterministic computation baked into a format (CSV formulas) | Anything the model already does well natively |
-
-If Claude can do it by just responding with text, it's not a skill — it's a prompt.
-
-## Skills
-
-| Function | Artifact | Why models can't |
-|----------|---------|-----------------|
-| `skills.generateQrCode({ data })` | SVG | Pixel-precise 2D barcode encoding |
-| `skills.buildPdf({ title, body })` | PDF (base64) | Binary format with object trees and xref tables |
-| `skills.buildSpreadsheet({ headers, rows })` | CSV/TSV | RFC 4180 escaping + formula computation |
-| `skills.generateIcal({ events })` | .ics | RFC 5545 spec (recurrence rules, VALARM, TZID) |
-| `skills.generateChart({ type, data })` | SVG | Visual rendering of data |
-
-All: synchronous, fully typed, zero external dependencies.
-
-## Use as a library
+**npm library**:
 
 ```bash
 npm install ai-skills
@@ -78,111 +25,67 @@ npm install ai-skills
 ```typescript
 import { skills } from "ai-skills";
 
-const qr = skills.generateQrCode({ data: "https://example.com" });       // → SVG
-const pdf = skills.buildPdf({ title: "Report", body: ["Hello."] });       // → { base64, pages }
-const csv = skills.buildSpreadsheet({ headers: ["A"], rows: [["1"]] });   // → CSV string
-const ics = skills.generateIcal({ events: [{ summary: "Meeting",
-              start: "2025-03-15T14:00:00", end: "2025-03-15T15:00:00" }] }); // → .ics string
-const svg = skills.generateChart({ type: "bar", data: { Q1: 100, Q2: 200 } }); // → SVG
+skills.generateQrCode({ data: "https://example.com" })           // → SVG
+skills.buildPdf({ title: "Report", body: ["Hello."] })           // → { base64, size, pages }
+skills.buildSpreadsheet({ headers: ["A"], rows: [["1"]] })       // → CSV string
+skills.generateIcal({ events: [{ summary: "Meeting",
+  start: "2025-03-15T14:00:00", end: "2025-03-15T15:00:00" }] }) // → .ics string
+skills.generateChart({ type: "bar", data: { Q1: 100, Q2: 200 } }) // → SVG
 ```
 
-## API reference
+**Anthropic Skills API** — bundle and upload to use with Claude API containers:
+
+```bash
+npx ai-skills bundle qr-code    # generates upload code
+```
+
+## Skills
+
+| Function | Output | Why models can't |
+|----------|--------|-----------------|
+| `generateQrCode({ data })` | SVG | Pixel-precise 2D barcode encoding |
+| `buildPdf({ title, body })` | PDF (base64) | Binary format with xref tables |
+| `buildSpreadsheet({ headers, rows })` | CSV/TSV | RFC 4180 escaping + formula computation |
+| `generateIcal({ events })` | .ics | RFC 5545 (recurrence, VALARM, TZID) |
+| `generateChart({ type, data })` | SVG | Data visualization rendering |
+
+## API
 
 ### `skills.generateQrCode(input)`
 
-```typescript
-skills.generateQrCode({ data: "https://example.com", size: 256, ecl: "M", fg: "#000", bg: "#fff" })
-```
-
-Returns SVG string. Options: `data` (required), `size` (px), `ecl` (L/M/Q/H), `fg`/`bg` (hex).
+`data` (required), `size` (px, default 256), `ecl` (L/M/Q/H), `fg`/`bg` (hex). Returns SVG string.
 
 ### `skills.buildPdf(input)`
 
-```typescript
-skills.buildPdf({
-  title: "Report", author: "Finance", date: "2025-01-15",
-  body: ["Paragraph.", { heading: "Section" }, { list: ["A", "B"] },
-         { table: { headers: ["X", "Y"], rows: [["1", "2"]] } }],
-  footer: "Page {page}", pageSize: "letter",
-})
-// → { base64: "...", size: 1234, pages: 1 }
-```
+`title`, `author`, `date`, `body` (array of strings, `{ heading }`, `{ table }`, `{ list }`), `footer` (`{page}` placeholder), `pageSize` (letter/a4). Returns `{ base64, size, pages }`.
 
 ### `skills.buildSpreadsheet(input)`
 
-```typescript
-skills.buildSpreadsheet({
-  headers: ["Name", "Q1", "Q2", "Total"],
-  rows: [["Alice", 100, 120, "=SUM(B{row}:C{row})"]],
-  summary: { Total: "sum" },
-  format: "csv", formulas: true, bom: true,
-})
-```
-
-Returns CSV/TSV string. Supports `format` (csv/tsv), `formulas` ({row} placeholders), `summary` (sum/avg/min/max/count), `bom` (Excel UTF-8).
+`headers`, `rows`, `summary` (column → sum/avg/min/max/count), `format` (csv/tsv), `formulas` (bool), `bom` (bool). Returns CSV/TSV string.
 
 ### `skills.generateIcal(input)`
 
-```typescript
-skills.generateIcal({
-  events: [{
-    summary: "Standup", start: "2025-03-01T09:00:00", end: "2025-03-01T09:15:00",
-    timezone: "America/New_York", rrule: "FREQ=DAILY;BYDAY=MO,TU,WE,TH,FR",
-    organizer: { name: "Alice", email: "alice@co.com" },
-    attendees: [{ name: "Bob", email: "bob@co.com", rsvp: true }],
-    alarm: { minutes_before: 15 }, status: "CONFIRMED",
-  }],
-  calendar_name: "Work", method: "REQUEST",
-})
-```
-
-Returns .ics string. Full RFC 5545: recurrence, timezones, attendees, alarms.
+`events` (array: `summary`, `start`, `end`, `timezone`, `rrule`, `organizer`, `attendees`, `alarm`, `status`, `url`), `calendar_name`, `method`. Returns .ics string.
 
 ### `skills.generateChart(input)`
 
-```typescript
-skills.generateChart({ type: "pie", data: { Chrome: 65, Firefox: 15, Other: 20 }, title: "Share" })
-```
-
-Returns SVG string. Types: `bar`/`pie` (key-value object), `line`/`scatter` (number[][] pairs). Options: `title`, `width`, `height`, `colors`.
-
-## Upload to Claude API
-
-Every skill ships as an [Anthropic Agent Skill](https://platform.claude.com/docs/en/agents-and-tools/agent-skills/overview) directory (`SKILL.md` + `scripts/`). Bundle and upload:
-
-```bash
-npx ai-skills bundle qr-code
-```
+`type` (bar/line/pie/scatter), `data` (object for bar/pie, number[][] for line/scatter), `title`, `width`, `height`, `colors`. Returns SVG string.
 
 ## CLI
 
 ```bash
-npx ai-skills list                          # List skills
-npx ai-skills run qr-code --data "hello"    # Run locally
-npx ai-skills init my-skill                 # Scaffold new skill
-npx ai-skills bundle pdf-builder            # Bundle for Anthropic
+npx ai-skills serve                          # Start MCP server
+npx ai-skills list                           # List skills
+npx ai-skills run qr-code --data "hello"     # Run locally
+npx ai-skills init my-skill                  # Scaffold new skill
+npx ai-skills bundle pdf-builder             # Bundle for Anthropic
 ```
 
-## Roadmap
+## The rule
 
-### File formats
-- **xlsx-builder** — native Excel (.xlsx) with sheets, styling, formulas
-- **docx-builder** — Word documents with headings, tables, images
-- **zip-archiver** — create .zip archives from multiple files/buffers
+**A skill belongs here iff it produces output an AI model cannot reliably generate from its token stream.**
 
-### Visual output
-- **barcode-generator** — Code128, EAN-13, UPC-A, DataMatrix as SVG
-- **svg-to-png** — rasterize SVG to PNG via Canvas
-- **diagram-generator** — flowcharts, sequence diagrams, ER diagrams as SVG
-
-### Strict-spec formats
-- **vcard-generator** — vCard 3.0/4.0 contact cards
-- **rss-builder** — valid RSS/Atom feeds
-- **sitemap-builder** — XML sitemaps with proper escaping and schema
-
-### Deterministic computation
-- **hash-generator** — SHA-256, HMAC, bcrypt, UUID generation
-- **color-converter** — HEX/RGB/HSL/CMYK with exact values, palette generation
+Binary/structured formats (PDF, XLSX), visual output (SVG charts, QR codes), strict-spec formats where one wrong byte breaks it (iCal, vCard), deterministic computation baked into a format (CSV formulas). If the model can do it by responding with text, it's not a skill.
 
 ## License
 

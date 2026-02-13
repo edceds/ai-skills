@@ -2,9 +2,7 @@ import { describe, it, expect } from "vitest";
 import { execFileSync } from "node:child_process";
 import { join } from "node:path";
 import { existsSync, rmSync } from "node:fs";
-import { loadSkill, loadAllSkills } from "../src/loader.js";
-import { bundleSkill } from "../src/bundle.js";
-import { skills } from "../src/agent.js";
+import { loadSkill, loadAllSkills, bundleSkill, skills } from "../src/index.js";
 
 const SKILLS_DIR = join(__dirname, "..", "skills");
 
