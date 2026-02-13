@@ -2,6 +2,18 @@
 
 [Agent Skills](https://platform.claude.com/docs/en/agents-and-tools/agent-skills/overview) that produce artifacts AI models can't generate from text alone. Ships as an MCP server — any agent can use all skills instantly.
 
+## Agent-first access
+
+This repo is designed to be used by AI agents, not just humans. Three ways an agent can start using skills immediately:
+
+**1. Share the repo URL** — send `https://github.com/edceds/ai-skills` in a chat. The agent reads [`llms.txt`](https://github.com/edceds/ai-skills/blob/main/llms.txt) and knows every skill, its inputs, and how to call it. Full API reference in [`llms-full.txt`](https://github.com/edceds/ai-skills/blob/main/llms-full.txt).
+
+**2. MCP server (zero config)** — add `{ "command": "npx", "args": ["ai-skills", "serve"] }` to any MCP-compatible agent. The agent discovers all 5 tools automatically.
+
+**3. npm library** — `npm install ai-skills` and `import { skills } from "ai-skills"` in any code execution environment.
+
+The `llms.txt` file follows the [llmstxt.org](https://llmstxt.org/) convention — a machine-readable project overview that any LLM can parse on first contact. If you're building an agent or operator that consumes tools from GitHub repos, point it at the `llms.txt` URL and it has everything it needs.
+
 ## Use with any agent (MCP)
 
 Add to **Claude Desktop** (`claude_desktop_config.json`):

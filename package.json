@@ -9,7 +9,9 @@
   },
   "files": [
     "dist",
-    "skills"
+    "skills",
+    "llms.txt",
+    "llms-full.txt"
   ],
   "scripts": {
     "build": "tsc",

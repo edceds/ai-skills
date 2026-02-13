@@ -1,0 +1,242 @@
+# ai-skills — full API reference
+
+> Artifact-producing skills for AI agents. Generates files that LLMs cannot produce from their token stream: QR codes (SVG), PDFs, spreadsheets (CSV/TSV), iCalendar (.ics), and charts (SVG). Zero external dependencies. Ships as an MCP server, npm library, and Anthropic Agent Skills.
+
+## Installation
+
+```bash
+npm install ai-skills
+```
+
+```typescript
+import { skills } from "ai-skills";
+```
+
+## MCP server
+
+Add to any MCP-compatible agent config:
+
+```json
+{ "command": "npx", "args": ["ai-skills", "serve"] }
+```
+
+Exposes 5 tools: `generate_qr_code`, `build_pdf`, `build_spreadsheet`, `generate_ical`, `generate_chart`. The agent discovers and calls them automatically.
+
+## CLI
+
+```bash
+npx ai-skills serve                          # Start MCP server
+npx ai-skills list                           # List skills
+npx ai-skills run qr-code --data "hello"     # Run a skill locally
+npx ai-skills init my-skill                  # Scaffold new skill
+npx ai-skills bundle pdf-builder             # Bundle for Anthropic upload
+```
+
+---
+
+## skills.generateQrCode(input)
+
+Generate a QR code as SVG.
+
+**Input:**
+- `data` (string, required) — text or URL to encode
+- `size` (number, default: 256) — image width/height in pixels
+- `ecl` ("L" | "M" | "Q" | "H", default: "M") — error correction level
+- `fg` (string, default: "#000000") — foreground color hex
+- `bg` (string, default: "#ffffff") — background color hex
+
+**Returns:** SVG string
+
+**Example:**
+```typescript
+const svg = skills.generateQrCode({
+  data: "https://example.com",
+  size: 300,
+  ecl: "H",
+  fg: "#000000",
+  bg: "#ffffff",
+});
+```
+
+---
+
+## skills.buildPdf(input)
+
+Generate a PDF document from structured content.
+
+**Input:**
+- `title` (string, optional) — document title
+- `author` (string, optional) — author name
+- `date` (string, optional) — document date
+- `body` (array, required) — array of content blocks:
+  - `string` — paragraph text
+  - `{ heading: string }` — section heading
+  - `{ table: { headers: string[], rows: string[][] } }` — table
+  - `{ list: string[] }` — bullet list
+- `footer` (string, optional) — footer text, use `{page}` for page number
+- `pageSize` ("letter" | "a4", default: "letter") — page dimensions
+
+**Returns:** `{ base64: string, size: number, pages: number }`
+
+**Example:**
+```typescript
+const result = skills.buildPdf({
+  title: "Quarterly Report",
+  author: "Finance Team",
+  date: "2025-01-15",
+  body: [
+    "Executive summary paragraph.",
+    { heading: "Revenue" },
+    "Revenue grew 15% quarter over quarter.",
+    { table: { headers: ["Region", "Q1", "Q2"], rows: [["US", "1.2M", "1.4M"]] } },
+    { list: ["First item", "Second item"] },
+  ],
+  footer: "Page {page}",
+  pageSize: "letter",
+});
+// result.base64 → base64-encoded PDF
+// result.pages → number of pages
+```
+
+---
+
+## skills.buildSpreadsheet(input)
+
+Generate a CSV or TSV spreadsheet with proper escaping and formulas.
+
+**Input:**
+- `headers` (string[], required) — column headers
+- `rows` ((string | number | null)[][], required) — data rows
+- `summary` (Record<string, "sum" | "avg" | "min" | "max" | "count">, optional) — summary row aggregation per column
+- `format` ("csv" | "tsv", default: "csv") — output format
+- `formulas` (boolean, default: false) — process `=SUM`, `{row}` placeholders
+- `bom` (boolean, default: false) — prepend UTF-8 BOM for Excel compatibility
+- `sheets` (array, optional) — multiple sheets, each with `{ name?, headers, rows, summary? }`
+
+**Returns:** CSV/TSV string
+
+**Example:**
+```typescript
+const csv = skills.buildSpreadsheet({
+  headers: ["Name", "Q1", "Q2", "Total"],
+  rows: [
+    ["Alice", 100, 120, "=SUM(B{row}:C{row})"],
+    ["Bob", 80, 90, "=SUM(B{row}:C{row})"],
+  ],
+  summary: { Q1: "sum", Q2: "sum", Total: "sum" },
+  format: "csv",
+  formulas: true,
+});
+```
+
+---
+
+## skills.generateIcal(input)
+
+Generate an iCalendar (.ics) file. RFC 5545 compliant.
+
+**Input:**
+- `events` (array, required) — array of event objects:
+  - `summary` (string, required) — event title
+  - `start` (string, required) — ISO 8601 datetime
+  - `end` (string, required) — ISO 8601 datetime
+  - `description` (string, optional) — event details
+  - `location` (string, optional) — physical or virtual location
+  - `timezone` (string, optional) — IANA timezone (e.g. "America/New_York")
+  - `organizer` ({ name: string, email: string }, optional)
+  - `attendees` ({ name: string, email: string, rsvp?: boolean }[], optional)
+  - `alarm` ({ minutes_before: number }, optional) — reminder
+  - `rrule` (string, optional) — RFC 5545 recurrence rule (e.g. "FREQ=WEEKLY;COUNT=10")
+  - `status` ("CONFIRMED" | "TENTATIVE" | "CANCELLED", optional)
+  - `url` (string, optional) — event URL
+- `calendar_name` (string, optional) — calendar display name
+- `method` (string, optional) — iCal method (e.g. "REQUEST", "PUBLISH")
+
+**Returns:** .ics string
+
+**Example:**
+```typescript
+const ics = skills.generateIcal({
+  events: [{
+    summary: "Team Standup",
+    start: "2025-03-01T09:00:00",
+    end: "2025-03-01T09:15:00",
+    timezone: "America/New_York",
+    rrule: "FREQ=DAILY;BYDAY=MO,TU,WE,TH,FR",
+    organizer: { name: "Alice", email: "alice@company.com" },
+    attendees: [{ name: "Bob", email: "bob@company.com", rsvp: true }],
+    alarm: { minutes_before: 15 },
+    status: "CONFIRMED",
+  }],
+  calendar_name: "Work",
+  method: "REQUEST",
+});
+```
+
+---
+
+## skills.generateChart(input)
+
+Generate an SVG chart from data.
+
+**Input:**
+- `type` ("bar" | "line" | "pie" | "scatter", required) — chart type
+- `data` (required):
+  - For bar/pie: `Record<string, number>` — key-value pairs (e.g. `{ "Q1": 100, "Q2": 200 }`)
+  - For line/scatter: `number[][]` — XY pairs (e.g. `[[1, 10], [2, 25], [3, 18]]`)
+- `title` (string, optional) — chart title
+- `width` (number, default: 600) — chart width in pixels
+- `height` (number, default: 400) — chart height in pixels
+- `colors` (string[], optional) — custom color palette
+
+**Returns:** SVG string
+
+**Example:**
+```typescript
+const svg = skills.generateChart({
+  type: "bar",
+  data: { "Q1": 100, "Q2": 150, "Q3": 200, "Q4": 180 },
+  title: "Revenue by Quarter",
+  width: 800,
+  height: 500,
+});
+```
+
+---
+
+## Anthropic Agent Skills upload
+
+Bundle a skill for upload to the Anthropic API:
+
+```bash
+npx ai-skills bundle qr-code
+```
+
+Then upload via the Anthropic Python SDK:
+
+```python
+import anthropic
+from anthropic.lib import files_from_dir
+
+client = anthropic.Anthropic()
+skill = client.beta.skills.create(
+    display_title="QR Code",
+    files=files_from_dir("/path/to/qr-code"),
+    betas=["skills-2025-10-02"],
+)
+```
+
+Use in messages:
+
+```typescript
+const response = await client.beta.messages.create({
+  model: "claude-sonnet-4-20250514",
+  max_tokens: 4096,
+  betas: ["code-execution-2025-08-25", "skills-2025-10-02"],
+  container: {
+    skills: [{ type: "custom", skill_id: "skill_xxx", version: "latest" }],
+  },
+  messages: [{ role: "user", content: "Generate a QR code for https://example.com" }],
+  tools: [{ type: "code_execution_20250825", name: "code_execution" }],
+});
+```
