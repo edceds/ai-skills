@@ -1,49 +1,44 @@
 # ai-skills
 
-[Agent Skills](https://platform.claude.com/docs/en/agents-and-tools/agent-skills/overview) that produce artifacts AI models can't generate from text alone — file formats, visual output, strict specs. One function call each.
+[Agent Skills](https://platform.claude.com/docs/en/agents-and-tools/agent-skills/overview) that produce artifacts AI models can't generate from text alone.
 
 ```typescript
 import { skills } from "ai-skills";
 
-// Generate a QR code → SVG
-const qr = skills.generateQrCode({ data: "https://example.com" });
-
-// Generate a PDF document → base64
-const pdf = skills.buildPdf({
-  title: "Q1 Report",
-  body: ["Revenue grew 15%.", { table: { headers: ["Region", "Rev"], rows: [["US", "1.2M"]] } }],
-});
-
-// Generate a spreadsheet → CSV text
-const csv = skills.buildSpreadsheet({
-  headers: ["Name", "Q1", "Q2", "Total"],
-  rows: [["Alice", 100, 120, "=SUM(B{row}:C{row})"]],
-  formulas: true,
-});
-
-// Generate calendar events → .ics text
-const ics = skills.generateIcal({
-  events: [{ summary: "Kickoff", start: "2025-03-15T14:00:00", end: "2025-03-15T15:00:00",
-             attendees: [{ name: "Bob", email: "bob@co.com", rsvp: true }] }],
-});
-
-// Generate a chart → SVG
-const chart = skills.generateChart({ type: "bar", data: { Q1: 100, Q2: 200 }, title: "Revenue" });
+const qr = skills.generateQrCode({ data: "https://example.com" });       // → SVG
+const pdf = skills.buildPdf({ title: "Report", body: ["Hello."] });       // → { base64, pages }
+const csv = skills.buildSpreadsheet({ headers: ["A"], rows: [["1"]] });   // → CSV string
+const ics = skills.generateIcal({ events: [{ summary: "Meeting",
+              start: "2025-03-15T14:00:00", end: "2025-03-15T15:00:00" }] }); // → .ics string
+const svg = skills.generateChart({ type: "bar", data: { Q1: 100, Q2: 200 } }); // → SVG
 ```
 
-## Why these skills
+## The rule
 
-AI models generate text. They can't produce QR codes, PDFs, valid .ics files, or properly escaped CSVs. These skills fill that gap — each one outputs a format the model physically cannot generate from its token stream.
+**A skill belongs here if and only if it produces an output that an AI model cannot reliably generate from its text/token stream.**
 
-| Skill | What models can't do | What this produces |
-|-------|---------------------|-------------------|
-| `generateQrCode` | Models can't draw pixel-precise 2D barcodes | Scannable QR code as SVG |
-| `buildPdf` | Models can't produce binary PDF format | Valid PDF with text, tables, lists, headers |
-| `buildSpreadsheet` | Models mess up CSV escaping, can't compute formulas | RFC 4180 CSV/TSV with formulas and summary rows |
-| `generateIcal` | Models frequently get the iCal spec wrong | RFC 5545 .ics with recurrence, attendees, alarms |
-| `generateChart` | Models can't output images | SVG bar, line, pie, scatter charts |
+This means:
 
-All functions are synchronous, fully typed, zero external dependencies.
+| Belongs here | Does NOT belong here |
+|-------------|---------------------|
+| Binary/structured file formats (PDF, XLSX) | Text analysis (summarization, sentiment) |
+| Visual output (SVG charts, QR codes, barcodes) | Text generation (emails, SQL, code) |
+| Strict-spec formats where one wrong byte = broken (iCal, vCard) | JSON/text transformation (parsing, querying) |
+| Deterministic computation baked into a format (CSV formulas) | Anything the model already does well natively |
+
+If Claude can do it by just responding with text, it's not a skill — it's a prompt.
+
+## Skills
+
+| Function | Artifact | Why models can't |
+|----------|---------|-----------------|
+| `skills.generateQrCode({ data })` | SVG | Pixel-precise 2D barcode encoding |
+| `skills.buildPdf({ title, body })` | PDF (base64) | Binary format with object trees and xref tables |
+| `skills.buildSpreadsheet({ headers, rows })` | CSV/TSV | RFC 4180 escaping + formula computation |
+| `skills.generateIcal({ events })` | .ics | RFC 5545 spec (recurrence rules, VALARM, TZID) |
+| `skills.generateChart({ type, data })` | SVG | Visual rendering of data |
+
+All: synchronous, fully typed, zero external dependencies.
 
 ## Install
 
@@ -51,16 +46,15 @@ All functions are synchronous, fully typed, zero external dependencies.
 npm install ai-skills
 ```
 
-## API
+## API reference
 
 ### `skills.generateQrCode(input)`
 
 ```typescript
-skills.generateQrCode({ data: "https://example.com", size: 256, ecl: "M" })
-// → SVG string
+skills.generateQrCode({ data: "https://example.com", size: 256, ecl: "M", fg: "#000", bg: "#fff" })
 ```
 
-Options: `data` (required), `size` (px, default 256), `ecl` (L/M/Q/H), `fg`/`bg` (hex colors).
+Returns SVG string. Options: `data` (required), `size` (px), `ecl` (L/M/Q/H), `fg`/`bg` (hex).
 
 ### `skills.buildPdf(input)`
 
@@ -69,7 +63,7 @@ skills.buildPdf({
   title: "Report", author: "Finance", date: "2025-01-15",
   body: ["Paragraph.", { heading: "Section" }, { list: ["A", "B"] },
          { table: { headers: ["X", "Y"], rows: [["1", "2"]] } }],
-  footer: "Page {page}",
+  footer: "Page {page}", pageSize: "letter",
 })
 // → { base64: "...", size: 1234, pages: 1 }
 ```
@@ -78,15 +72,14 @@ skills.buildPdf({
 
 ```typescript
 skills.buildSpreadsheet({
-  headers: ["Name", "Score"],
-  rows: [["Alice", 95], ["Bob", 87]],
-  summary: { Score: "avg" },
-  format: "csv",  // or "tsv"
-  formulas: true,  // process =SUM, {row} placeholders
-  bom: true,       // UTF-8 BOM for Excel
+  headers: ["Name", "Q1", "Q2", "Total"],
+  rows: [["Alice", 100, 120, "=SUM(B{row}:C{row})"]],
+  summary: { Total: "sum" },
+  format: "csv", formulas: true, bom: true,
 })
-// → CSV string
 ```
+
+Returns CSV/TSV string. Supports `format` (csv/tsv), `formulas` ({row} placeholders), `summary` (sum/avg/min/max/count), `bom` (Excel UTF-8).
 
 ### `skills.generateIcal(input)`
 
@@ -94,33 +87,31 @@ skills.buildSpreadsheet({
 skills.generateIcal({
   events: [{
     summary: "Standup", start: "2025-03-01T09:00:00", end: "2025-03-01T09:15:00",
-    timezone: "America/New_York",
-    rrule: "FREQ=DAILY;BYDAY=MO,TU,WE,TH,FR",
+    timezone: "America/New_York", rrule: "FREQ=DAILY;BYDAY=MO,TU,WE,TH,FR",
     organizer: { name: "Alice", email: "alice@co.com" },
     attendees: [{ name: "Bob", email: "bob@co.com", rsvp: true }],
-    alarm: { minutes_before: 15 },
+    alarm: { minutes_before: 15 }, status: "CONFIRMED",
   }],
   calendar_name: "Work", method: "REQUEST",
 })
-// → .ics string
 ```
+
+Returns .ics string. Full RFC 5545: recurrence, timezones, attendees, alarms.
 
 ### `skills.generateChart(input)`
 
 ```typescript
-skills.generateChart({ type: "pie", data: { Chrome: 65, Firefox: 15, Safari: 12, Other: 8 } })
-// → SVG string
+skills.generateChart({ type: "pie", data: { Chrome: 65, Firefox: 15, Other: 20 }, title: "Share" })
 ```
 
-Types: `bar` (key-value), `line` (xy pairs), `pie` (key-value), `scatter` (xy pairs).
-Options: `title`, `width`, `height`, `colors`.
+Returns SVG string. Types: `bar`/`pie` (key-value object), `line`/`scatter` (number[][] pairs). Options: `title`, `width`, `height`, `colors`.
 
 ## Upload to Claude API
 
-Every skill also works as an [Anthropic Agent Skill](https://platform.claude.com/docs/en/agents-and-tools/agent-skills/overview) for Claude's code execution container:
+Every skill ships as an [Anthropic Agent Skill](https://platform.claude.com/docs/en/agents-and-tools/agent-skills/overview) directory (`SKILL.md` + `scripts/`). Bundle and upload:
 
 ```bash
-npx ai-skills bundle qr-code  # shows upload code
+npx ai-skills bundle qr-code
 ```
 
 ## CLI
@@ -134,10 +125,24 @@ npx ai-skills bundle pdf-builder            # Bundle for Anthropic
 
 ## Roadmap
 
-- **barcode-generator** — Code128, EAN-13, UPC-A barcodes as SVG
-- **xlsx-builder** — native Excel files with multiple sheets and styling
+### File formats
+- **xlsx-builder** — native Excel (.xlsx) with sheets, styling, formulas
+- **docx-builder** — Word documents with headings, tables, images
+- **zip-archiver** — create .zip archives from multiple files/buffers
+
+### Visual output
+- **barcode-generator** — Code128, EAN-13, UPC-A, DataMatrix as SVG
+- **svg-to-png** — rasterize SVG to PNG via Canvas
+- **diagram-generator** — flowcharts, sequence diagrams, ER diagrams as SVG
+
+### Strict-spec formats
 - **vcard-generator** — vCard 3.0/4.0 contact cards
-- **svg-to-png** — rasterize SVG to PNG using Canvas
+- **rss-builder** — valid RSS/Atom feeds
+- **sitemap-builder** — XML sitemaps with proper escaping and schema
+
+### Deterministic computation
+- **hash-generator** — SHA-256, HMAC, bcrypt, UUID generation
+- **color-converter** — HEX/RGB/HSL/CMYK with exact values, palette generation
 
 ## License
 
