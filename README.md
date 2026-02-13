@@ -1,36 +1,49 @@
 # ai-skills
 
-Production-ready [Agent Skills](https://platform.claude.com/docs/en/agents-and-tools/agent-skills/overview) for the Claude API. One function call per capability.
+[Agent Skills](https://platform.claude.com/docs/en/agents-and-tools/agent-skills/overview) that produce artifacts AI models can't generate from text alone — file formats, visual output, strict specs. One function call each.
 
 ```typescript
 import { skills } from "ai-skills";
 
-// Parse an invoice
-const invoice = skills.parseInvoice({ text: invoiceText });
-// → { invoice_number, total, line_items, tax_rate, vendor, ... }
+// Generate a QR code → SVG
+const qr = skills.generateQrCode({ data: "https://example.com" });
 
-// Draft an email
-const email = skills.composeEmail({
-  type: "follow-up", to: "Jane", from: "John",
-  points: ["discussed pricing", "agreed on Q2 timeline"],
+// Generate a PDF document → base64
+const pdf = skills.buildPdf({
+  title: "Q1 Report",
+  body: ["Revenue grew 15%.", { table: { headers: ["Region", "Rev"], rows: [["US", "1.2M"]] } }],
 });
-// → { subject, body, html }
 
-// Generate SQL from English
-const query = skills.generateSql({
-  schema: { users: { columns: { id: "serial", name: "varchar", age: "int" } } },
-  query: "users older than 30 sorted by name",
+// Generate a spreadsheet → CSV text
+const csv = skills.buildSpreadsheet({
+  headers: ["Name", "Q1", "Q2", "Total"],
+  rows: [["Alice", 100, 120, "=SUM(B{row}:C{row})"]],
+  formulas: true,
 });
-// → { sql: "SELECT users.* FROM users WHERE users.age > 30 ORDER BY ...", ... }
 
-// Mock an API response
-const mock = skills.mockApiResponse({ endpoint: "/users", method: "GET", count: 5 });
-// → { data: [...], meta: { total, page, per_page } }
+// Generate calendar events → .ics text
+const ics = skills.generateIcal({
+  events: [{ summary: "Kickoff", start: "2025-03-15T14:00:00", end: "2025-03-15T15:00:00",
+             attendees: [{ name: "Bob", email: "bob@co.com", rsvp: true }] }],
+});
 
-// Generate a chart
-const svg = skills.generateChart({ type: "bar", data: { Q1: 100, Q2: 200 }, title: "Revenue" });
-// → "<svg>...</svg>"
+// Generate a chart → SVG
+const chart = skills.generateChart({ type: "bar", data: { Q1: 100, Q2: 200 }, title: "Revenue" });
 ```
+
+## Why these skills
+
+AI models generate text. They can't produce QR codes, PDFs, valid .ics files, or properly escaped CSVs. These skills fill that gap — each one outputs a format the model physically cannot generate from its token stream.
+
+| Skill | What models can't do | What this produces |
+|-------|---------------------|-------------------|
+| `generateQrCode` | Models can't draw pixel-precise 2D barcodes | Scannable QR code as SVG |
+| `buildPdf` | Models can't produce binary PDF format | Valid PDF with text, tables, lists, headers |
+| `buildSpreadsheet` | Models mess up CSV escaping, can't compute formulas | RFC 4180 CSV/TSV with formulas and summary rows |
+| `generateIcal` | Models frequently get the iCal spec wrong | RFC 5545 .ics with recurrence, attendees, alarms |
+| `generateChart` | Models can't output images | SVG bar, line, pie, scatter charts |
+
+All functions are synchronous, fully typed, zero external dependencies.
 
 ## Install
 
@@ -38,93 +51,93 @@ const svg = skills.generateChart({ type: "bar", data: { Q1: 100, Q2: 200 }, titl
 npm install ai-skills
 ```
 
-## Skills
+## API
 
-| Function | What it does |
-|----------|-------------|
-| `skills.parseInvoice({ text })` | Extract structured data from invoices — line items, totals, tax, vendor, dates, payment terms |
-| `skills.composeEmail({ type, to, from, points })` | Draft professional emails (8 types: follow-up, outreach, recap, escalation, thank-you, intro, reminder, apology) |
-| `skills.generateSql({ schema, query })` | Natural language to SQL (SELECT, WHERE, GROUP BY, ORDER BY, LIMIT, multi-dialect) |
-| `skills.createTable({ tables })` | Generate CREATE TABLE from compact definitions |
-| `skills.mockApiResponse({ endpoint, method })` | Mock JSON responses with realistic data for any REST endpoint |
-| `skills.mockOpenApi({ name, endpoints })` | Generate OpenAPI 3.0 specs |
-| `skills.mockEndpoints({ resources })` | Generate CRUD endpoint definitions from resource names |
-| `skills.generateChart({ type, data })` | Data to SVG charts — bar, line, pie, scatter |
+### `skills.generateQrCode(input)`
 
-All functions are synchronous, zero external dependencies, fully typed.
+```typescript
+skills.generateQrCode({ data: "https://example.com", size: 256, ecl: "M" })
+// → SVG string
+```
+
+Options: `data` (required), `size` (px, default 256), `ecl` (L/M/Q/H), `fg`/`bg` (hex colors).
+
+### `skills.buildPdf(input)`
+
+```typescript
+skills.buildPdf({
+  title: "Report", author: "Finance", date: "2025-01-15",
+  body: ["Paragraph.", { heading: "Section" }, { list: ["A", "B"] },
+         { table: { headers: ["X", "Y"], rows: [["1", "2"]] } }],
+  footer: "Page {page}",
+})
+// → { base64: "...", size: 1234, pages: 1 }
+```
+
+### `skills.buildSpreadsheet(input)`
+
+```typescript
+skills.buildSpreadsheet({
+  headers: ["Name", "Score"],
+  rows: [["Alice", 95], ["Bob", 87]],
+  summary: { Score: "avg" },
+  format: "csv",  // or "tsv"
+  formulas: true,  // process =SUM, {row} placeholders
+  bom: true,       // UTF-8 BOM for Excel
+})
+// → CSV string
+```
+
+### `skills.generateIcal(input)`
+
+```typescript
+skills.generateIcal({
+  events: [{
+    summary: "Standup", start: "2025-03-01T09:00:00", end: "2025-03-01T09:15:00",
+    timezone: "America/New_York",
+    rrule: "FREQ=DAILY;BYDAY=MO,TU,WE,TH,FR",
+    organizer: { name: "Alice", email: "alice@co.com" },
+    attendees: [{ name: "Bob", email: "bob@co.com", rsvp: true }],
+    alarm: { minutes_before: 15 },
+  }],
+  calendar_name: "Work", method: "REQUEST",
+})
+// → .ics string
+```
+
+### `skills.generateChart(input)`
+
+```typescript
+skills.generateChart({ type: "pie", data: { Chrome: 65, Firefox: 15, Safari: 12, Other: 8 } })
+// → SVG string
+```
+
+Types: `bar` (key-value), `line` (xy pairs), `pie` (key-value), `scatter` (xy pairs).
+Options: `title`, `width`, `height`, `colors`.
 
 ## Upload to Claude API
 
-Every skill also works as an [Anthropic Agent Skill](https://platform.claude.com/docs/en/agents-and-tools/agent-skills/overview) — a directory with `SKILL.md` + scripts that Claude can use in its code execution container.
+Every skill also works as an [Anthropic Agent Skill](https://platform.claude.com/docs/en/agents-and-tools/agent-skills/overview) for Claude's code execution container:
 
 ```bash
-# Bundle a skill for upload
-npx ai-skills bundle invoice-parser
-```
-
-This gives you the upload code:
-
-```python
-import anthropic
-from anthropic.lib import files_from_dir
-
-client = anthropic.Anthropic()
-skill = client.beta.skills.create(
-    display_title="Invoice Parser",
-    files=files_from_dir("./skills/invoice-parser"),
-    betas=["skills-2025-10-02"],
-)
-```
-
-Then use it in your agent:
-
-```typescript
-const response = await anthropic.beta.messages.create({
-  model: "claude-sonnet-4-20250514",
-  max_tokens: 4096,
-  betas: ["code-execution-2025-08-25", "skills-2025-10-02"],
-  container: {
-    skills: [{ type: "custom", skill_id: "skill_...", version: "latest" }],
-  },
-  messages: [{ role: "user", content: "Parse this invoice and extract the totals" }],
-  tools: [{ type: "code_execution_20250825", name: "code_execution" }],
-});
+npx ai-skills bundle qr-code  # shows upload code
 ```
 
 ## CLI
 
 ```bash
-npx ai-skills list                    # List available skills
-npx ai-skills info  <skill>           # Show skill details
-npx ai-skills run   <skill> [args]    # Run a skill locally
-npx ai-skills init  <name>            # Scaffold a new skill
-npx ai-skills bundle <skill>          # Bundle for Anthropic upload
-```
-
-## Create your own skill
-
-```bash
-npx ai-skills init my-custom-skill
-# Creates skills/my-custom-skill/SKILL.md + scripts/main.ts
-```
-
-Each skill is a directory:
-
-```
-my-skill/
-├── SKILL.md          # YAML frontmatter (name, description) + instructions
-└── scripts/
-    └── main.ts       # Executable script Claude runs
+npx ai-skills list                          # List skills
+npx ai-skills run qr-code --data "hello"    # Run locally
+npx ai-skills init my-skill                 # Scaffold new skill
+npx ai-skills bundle pdf-builder            # Bundle for Anthropic
 ```
 
 ## Roadmap
 
-Planned skills:
-- **contract-analyzer** — extract clauses, obligations, dates from legal docs
-- **spreadsheet-builder** — generate Excel/CSV reports from structured data
-- **calendar-scheduler** — parse availability, suggest meeting times, generate .ics
-- **webhook-handler** — parse and route incoming webhook payloads (Stripe, GitHub, Slack)
-- **pdf-report** — generate formatted PDF reports from data + templates
+- **barcode-generator** — Code128, EAN-13, UPC-A barcodes as SVG
+- **xlsx-builder** — native Excel files with multiple sheets and styling
+- **vcard-generator** — vCard 3.0/4.0 contact cards
+- **svg-to-png** — rasterize SVG to PNG using Canvas
 
 ## License
 

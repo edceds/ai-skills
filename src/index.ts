@@ -3,11 +3,11 @@ export { skills } from "./agent.js";
 
 // Typed inputs/outputs
 export type {
-  InvoiceParserInput, InvoiceParserOutput,
-  EmailComposerInput, EmailComposerOutput,
-  SqlGeneratorInput, SqlGeneratorOutput, SqlCreateTableInput,
-  ApiMockResponseInput, ApiMockOpenApiInput, ApiMockEndpointsInput,
   ChartInput,
+  QrCodeInput,
+  PdfInput, PdfOutput, PdfBlock,
+  SpreadsheetInput, SpreadsheetSheet,
+  IcalInput, IcalEvent, IcalAttendee,
 } from "./agent.js";
 
 // Low-level: loader, runner, bundler
