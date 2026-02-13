@@ -1,7 +1,7 @@
 {
   "name": "ai-skills",
   "version": "0.1.0",
-  "description": "Production-ready Agent Skills for the Claude API — invoice parsing, email drafting, SQL generation, API mocking, chart generation. CLI to run/test/bundle.",
+  "description": "Artifact-producing Agent Skills — QR codes, PDFs, spreadsheets, calendars, charts. MCP server for instant agent access.",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "bin": {
@@ -25,13 +25,19 @@
     "claude",
     "agent-skills",
     "ai-agent",
+    "mcp",
     "skills",
     "claude-api",
     "agent",
-    "llm-tools"
+    "llm-tools",
+    "model-context-protocol"
   ],
   "author": "",
   "license": "MIT",
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.26.0",
+    "zod": "^4.3.6"
+  },
   "devDependencies": {
     "@types/node": "^22.15.21",
     "tsx": "^4.19.4",

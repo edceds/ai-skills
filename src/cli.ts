@@ -186,22 +186,38 @@ function main() {
   const cmd = args[0];
 
   if (!cmd || cmd === "--help" || cmd === "-h") {
-    log(bold("ai-skills") + " — ready-to-use Agent Skills for Claude API\n");
+    log(bold("ai-skills") + " — artifact-producing skills for AI agents\n");
     log("Commands:");
+    log(`  ${cyan("serve")}                     Start MCP server (agents connect to this)`);
     log(`  ${cyan("list")}                      List available skills`);
     log(`  ${cyan("info")}  ${dim("<skill>")}             Show skill details`);
     log(`  ${cyan("run")}   ${dim("<skill> [args...]")}   Run a skill script locally`);
     log(`  ${cyan("init")}  ${dim("<name>")}              Scaffold a new skill`);
     log(`  ${cyan("bundle")} ${dim("<skill> [--out dir]")} Bundle for Anthropic upload\n`);
+    log("Agent setup (MCP):");
+    log(`  ${dim('Add to Claude Desktop / Cursor config:')}`);
+    log(`  ${dim('{ "command": "npx", "args": ["ai-skills", "serve"] }')}\n`);
     log("Examples:");
-    log(`  ${dim("$ ai-skills list")}`);
-    log(`  ${dim("$ ai-skills run csv-analytics stats --file data.csv")}`);
+    log(`  ${dim("$ ai-skills serve")}`);
+    log(`  ${dim("$ ai-skills run qr-code --data https://example.com")}`);
     log(`  ${dim("$ ai-skills init my-custom-skill")}`);
-    log(`  ${dim("$ ai-skills bundle csv-analytics --out ./dist")}`);
+    log(`  ${dim("$ ai-skills bundle pdf-builder")}`);
     return;
   }
 
   switch (cmd) {
+    case "serve":
+    case "mcp": {
+      // Dynamic import to avoid loading MCP deps for other commands
+      import("./mcp.js").then(({ createMcpServer }) => {
+        const { StdioServerTransport } = require("@modelcontextprotocol/sdk/server/stdio.js");
+        const server = createMcpServer();
+        const transport = new StdioServerTransport();
+        server.connect(transport);
+      });
+      break;
+    }
+
     case "list":
     case "ls":
       cmdList();

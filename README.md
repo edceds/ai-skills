@@ -1,17 +1,34 @@
 # ai-skills
 
-[Agent Skills](https://platform.claude.com/docs/en/agents-and-tools/agent-skills/overview) that produce artifacts AI models can't generate from text alone.
+[Agent Skills](https://platform.claude.com/docs/en/agents-and-tools/agent-skills/overview) that produce artifacts AI models can't generate from text alone. Ships as an MCP server — any agent can use all skills instantly.
 
-```typescript
-import { skills } from "ai-skills";
+## Use with any agent (MCP)
 
-const qr = skills.generateQrCode({ data: "https://example.com" });       // → SVG
-const pdf = skills.buildPdf({ title: "Report", body: ["Hello."] });       // → { base64, pages }
-const csv = skills.buildSpreadsheet({ headers: ["A"], rows: [["1"]] });   // → CSV string
-const ics = skills.generateIcal({ events: [{ summary: "Meeting",
-              start: "2025-03-15T14:00:00", end: "2025-03-15T15:00:00" }] }); // → .ics string
-const svg = skills.generateChart({ type: "bar", data: { Q1: 100, Q2: 200 } }); // → SVG
+Add to **Claude Desktop** (`claude_desktop_config.json`):
+
+```json
+{
+  "mcpServers": {
+    "ai-skills": {
+      "command": "npx",
+      "args": ["ai-skills", "serve"]
+    }
+  }
+}
 ```
+
+Add to **Cursor** (Settings → MCP Servers):
+
+```json
+{
+  "ai-skills": {
+    "command": "npx",
+    "args": ["ai-skills", "serve"]
+  }
+}
+```
+
+That's it. The agent now has 5 tools: `generate_qr_code`, `build_pdf`, `build_spreadsheet`, `generate_ical`, `generate_chart`. It discovers and uses them automatically when relevant.
 
 ## The rule
 
@@ -40,10 +57,21 @@ If Claude can do it by just responding with text, it's not a skill — it's a pr
 
 All: synchronous, fully typed, zero external dependencies.
 
-## Install
+## Use as a library
 
 ```bash
 npm install ai-skills
+```
+
+```typescript
+import { skills } from "ai-skills";
+
+const qr = skills.generateQrCode({ data: "https://example.com" });       // → SVG
+const pdf = skills.buildPdf({ title: "Report", body: ["Hello."] });       // → { base64, pages }
+const csv = skills.buildSpreadsheet({ headers: ["A"], rows: [["1"]] });   // → CSV string
+const ics = skills.generateIcal({ events: [{ summary: "Meeting",
+              start: "2025-03-15T14:00:00", end: "2025-03-15T15:00:00" }] }); // → .ics string
+const svg = skills.generateChart({ type: "bar", data: { Q1: 100, Q2: 200 } }); // → SVG
 ```
 
 ## API reference

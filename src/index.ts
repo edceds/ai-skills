@@ -10,6 +10,9 @@ export type {
   IcalInput, IcalEvent, IcalAttendee,
 } from "./agent.js";
 
+// MCP server
+export { createMcpServer } from "./mcp.js";
+
 // Low-level: loader, runner, bundler
 export { loadSkill, loadAllSkills, parseFrontmatter } from "./loader.js";
 export { runScript } from "./runner.js";
