@@ -1,30 +1,8 @@
-import { readFileSync, readdirSync, existsSync, writeFileSync } from "node:fs";
+import { readFileSync, readdirSync, existsSync } from "node:fs";
 import { execFileSync } from "node:child_process";
 import { join, dirname } from "node:path";
 
 const SKILLS_DIR = join(dirname(dirname(__dirname)));
-
-function usage() {
-  console.log(`Usage: run.ts <skill> <json-input>
-       run.ts <skill> --stdin
-       run.ts list
-
-Skills:
-  qr-code              Generate QR code SVG
-  pdf-builder          Generate PDF document
-  spreadsheet-builder  Generate CSV/TSV spreadsheet
-  chart-generator      Generate SVG chart
-  ical-generator       Generate iCalendar .ics file
-
-Examples:
-  run.ts qr-code '{"data":"https://example.com"}'
-  run.ts pdf-builder '{"title":"Report","body":["Hello world."]}'
-  run.ts spreadsheet-builder '{"headers":["Name","Age"],"rows":[["Alice",30]]}'
-  run.ts chart-generator '{"type":"bar","data":{"Q1":100,"Q2":200}}'
-  run.ts ical-generator '{"events":[{"summary":"Meeting","start":"2025-03-15T14:00:00","end":"2025-03-15T15:00:00"}]}'
-  echo '{"data":"hello"}' | run.ts qr-code --stdin`);
-  process.exit(0);
-}
 
 function listSkills() {
   const dirs = readdirSync(SKILLS_DIR, { withFileTypes: true })
@@ -112,14 +90,70 @@ const ROUTES: Record<string, SkillRoute> = {
       return JSON.stringify(data);
     },
   },
+  "vcard-generator": {
+    script: "vcard-generator/scripts/generate.ts",
+    buildArgs(input) {
+      const args = ["--stdin"];
+      if (input.out) args.push("--out", input.out);
+      return args;
+    },
+    stdin(input) {
+      const { out, ...data } = input;
+      return JSON.stringify(data);
+    },
+  },
+  "barcode-generator": {
+    script: "barcode-generator/scripts/generate.ts",
+    buildArgs(input) {
+      const args = ["--data", input.data];
+      if (input.width) args.push("--width", String(input.width));
+      if (input.height) args.push("--height", String(input.height));
+      if (input.show_text === false) args.push("--no-text");
+      if (input.out) args.push("--out", input.out);
+      return args;
+    },
+  },
+  "wav-generator": {
+    script: "wav-generator/scripts/generate.ts",
+    buildArgs(input) {
+      const args = ["--stdin"];
+      if (input.out) args.push("--out", input.out);
+      return args;
+    },
+    stdin(input) {
+      const { out, ...data } = input;
+      return JSON.stringify(data);
+    },
+  },
+  "hash-generator": {
+    script: "hash-generator/scripts/generate.ts",
+    buildArgs(input) {
+      const args = ["--stdin"];
+      return args;
+    },
+    stdin(input) {
+      return JSON.stringify(input);
+    },
+  },
+  "zip-archive": {
+    script: "zip-archive/scripts/generate.ts",
+    buildArgs(input) {
+      const args = ["--stdin"];
+      if (input.out) args.push("--out", input.out);
+      return args;
+    },
+    stdin(input) {
+      const { out, ...data } = input;
+      return JSON.stringify(data);
+    },
+  },
 };
 
 // ─── Main ────────────────────────────────────────────────────────────────────
 
 function main() {
   const args = process.argv.slice(2);
-  if (args.length === 0 || args[0] === "--help" || args[0] === "-h") usage();
-  if (args[0] === "list") { listSkills(); return; }
+  if (args.length === 0 || args[0] === "list") { listSkills(); return; }
 
   const skillName = args[0];
   const route = ROUTES[skillName];
@@ -128,14 +162,13 @@ function main() {
     process.exit(1);
   }
 
-  // Read JSON input from arg or stdin
   let jsonStr: string;
   if (args[1] === "--stdin") {
     jsonStr = readFileSync(0, "utf-8");
   } else if (args[1]) {
     jsonStr = args[1];
   } else {
-    console.error(`Missing JSON input. Usage: run.ts ${skillName} '<json>' or run.ts ${skillName} --stdin`);
+    console.error(`Missing JSON input. Usage: run.ts ${skillName} '<json>'`);
     process.exit(1);
   }
 

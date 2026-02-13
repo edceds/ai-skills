@@ -23,17 +23,6 @@ export interface ScriptResult {
   exitCode: number;
 }
 
-export interface AnthropicSkillFile {
-  path: string;
-  content: string;
-  mime: string;
-}
-
-export interface SkillBundle {
-  display_title: string;
-  files: AnthropicSkillFile[];
-}
-
 export interface ChartInput {
   type: "bar" | "line" | "pie" | "scatter";
   data: Record<string, number> | number[][];
@@ -114,6 +103,84 @@ export interface IcalInput {
   events: IcalEvent[];
   calendar_name?: string;
   method?: string;
+}
+
+export interface VCardNameInput {
+  given: string;
+  family: string;
+  prefix?: string;
+  suffix?: string;
+}
+
+export interface VCardAddressInput {
+  street?: string;
+  city?: string;
+  state?: string;
+  zip?: string;
+  country?: string;
+}
+
+export interface VCardInput {
+  name: VCardNameInput;
+  org?: string;
+  title?: string;
+  email?: string | string[];
+  phone?: string | string[];
+  address?: VCardAddressInput;
+  url?: string;
+  note?: string;
+  photo_base64?: string;
+}
+
+export interface BarcodeInput {
+  data: string;
+  width?: number;
+  height?: number;
+  show_text?: boolean;
+}
+
+export interface WavInput {
+  frequency: number;
+  duration: number;
+  sample_rate?: number;
+  volume?: number;
+  waveform?: "sine" | "square" | "sawtooth";
+}
+
+export interface WavOutput {
+  base64: string;
+  size: number;
+  duration: number;
+  frequency: number;
+}
+
+export interface HashInput {
+  data: string;
+  algorithm?: "sha256" | "sha512" | "md5" | "sha1";
+  encoding?: "hex" | "base64";
+  hmac_key?: string;
+}
+
+export interface HashOutput {
+  hash: string;
+  algorithm: string;
+  encoding: string;
+  hmac: boolean;
+}
+
+export interface ZipFileEntry {
+  name: string;
+  content: string;
+}
+
+export interface ZipInput {
+  files: ZipFileEntry[];
+}
+
+export interface ZipOutput {
+  base64: string;
+  size: number;
+  entries: number;
 }
 
 // ─── Loader ──────────────────────────────────────────────────────────────────
@@ -254,66 +321,28 @@ export const skills = {
   generateIcal(input: IcalInput): string {
     return execRaw("ical-generator", ["--stdin"], JSON.stringify(input));
   },
+
+  generateVCard(input: VCardInput): string {
+    return execRaw("vcard-generator", ["--stdin"], JSON.stringify(input));
+  },
+
+  generateBarcode(input: BarcodeInput): string {
+    const args = ["--data", input.data];
+    if (input.width) args.push("--width", String(input.width));
+    if (input.height) args.push("--height", String(input.height));
+    if (input.show_text === false) args.push("--no-text");
+    return execRaw("barcode-generator", args);
+  },
+
+  generateWav(input: WavInput): WavOutput {
+    return exec("wav-generator", ["--stdin"], JSON.stringify(input));
+  },
+
+  generateHash(input: HashInput): HashOutput {
+    return exec("hash-generator", ["--stdin"], JSON.stringify(input));
+  },
+
+  createZip(input: ZipInput): ZipOutput {
+    return exec("zip-archive", ["--stdin"], JSON.stringify(input));
+  },
 };
-
-// ─── Bundle ──────────────────────────────────────────────────────────────────
-
-const MIME: Record<string, string> = {
-  ".md": "text/markdown", ".ts": "text/x-typescript", ".js": "application/javascript",
-  ".py": "text/x-python", ".sh": "text/x-shellscript", ".json": "application/json",
-  ".txt": "text/plain", ".yaml": "text/yaml", ".yml": "text/yaml", ".csv": "text/csv",
-};
-
-function titleCase(name: string): string {
-  return name.split("-").map((w) => w[0].toUpperCase() + w.slice(1)).join(" ");
-}
-
-export function bundleSkill(directory: string): SkillBundle {
-  const skill = loadSkill(directory);
-  const name = skill.metadata.name;
-  const files: AnthropicSkillFile[] = [];
-
-  files.push({ path: `${name}/SKILL.md`, content: readFileSync(join(directory, "SKILL.md"), "utf-8"), mime: "text/markdown" });
-  for (const script of skill.scripts) {
-    files.push({ path: `${name}/${script}`, content: readFileSync(join(directory, script), "utf-8"), mime: MIME[extname(script)] ?? "application/octet-stream" });
-  }
-  for (const res of skill.resources) {
-    const full = join(directory, res);
-    if (existsSync(full)) files.push({ path: `${name}/${res}`, content: readFileSync(full, "utf-8"), mime: MIME[extname(res)] ?? "application/octet-stream" });
-  }
-
-  return { display_title: titleCase(name), files };
-}
-
-export function generateUploadCurl(bundle: SkillBundle, apiKey = "$ANTHROPIC_API_KEY"): string {
-  return [
-    `# Upload "${bundle.display_title}" to Anthropic`,
-    `# Requires: pip install anthropic`,
-    ``, `import anthropic`, `from anthropic.lib import files_from_dir`, ``,
-    `client = anthropic.Anthropic(api_key="${apiKey}")`, ``,
-    `skill = client.beta.skills.create(`,
-    `    display_title="${bundle.display_title}",`,
-    `    files=files_from_dir("/path/to/${bundle.files[0].path.split("/")[0]}"),`,
-    `    betas=["skills-2025-10-02"],`,
-    `)`, `print(f"Created: {skill.id}")`,
-  ].join("\n");
-}
-
-export function generateUsageSnippet(bundle: SkillBundle, skillId = "skill_YOUR_SKILL_ID"): string {
-  return [
-    `import Anthropic from "@anthropic-ai/sdk";`, ``,
-    `const client = new Anthropic();`, ``,
-    `const response = await client.beta.messages.create({`,
-    `  model: "claude-sonnet-4-20250514",`,
-    `  max_tokens: 4096,`,
-    `  betas: ["code-execution-2025-08-25", "skills-2025-10-02"],`,
-    `  container: {`,
-    `    skills: [{ type: "custom", skill_id: "${skillId}", version: "latest" }],`,
-    `  },`,
-    `  messages: [{ role: "user", content: "Use ${bundle.display_title} to ..." }],`,
-    `  tools: [{ type: "code_execution_20250825", name: "code_execution" }],`,
-    `});`, ``, `console.log(response.content);`,
-  ].join("\n");
-}
-
-// MCP server: import { createMcpServer } from "ai-skills/mcp"

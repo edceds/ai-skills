@@ -1,61 +1,33 @@
 # ai-skills
 
-> Artifact-producing skills for AI agents. Generates files that LLMs cannot produce from their token stream: QR codes (SVG), PDFs, spreadsheets (CSV/TSV), iCalendar (.ics), and charts (SVG). Zero external dependencies.
+> 10 artifact-producing skills for AI agents. Generates files LLMs cannot produce from their token stream. MCP server or TypeScript library. Zero external dependencies.
 
-## If you're in this repo (from source)
-
-Run any skill right now:
-
-```bash
-npx tsx src/cli.ts run qr-code --data "https://example.com"
-npx tsx src/cli.ts run chart-generator bar --stdin <<< '{"Q1":100,"Q2":200}'
-npx tsx src/cli.ts run pdf-builder --stdin <<< '{"title":"Report","body":["Hello."]}'
-npx tsx src/cli.ts run spreadsheet-builder --stdin <<< '{"headers":["A","B"],"rows":[["1","2"]]}'
-npx tsx src/cli.ts run ical-generator --stdin <<< '{"events":[{"summary":"Meeting","start":"2025-03-15T14:00:00","end":"2025-03-15T15:00:00"}]}'
-```
-
-Or import directly:
-
-```typescript
-import { skills } from "./src/index.ts";
-skills.generateQrCode({ data: "https://example.com" })  // → SVG string
-```
-
-List all skills: `npx tsx src/cli.ts list`
-
-## Use via MCP (any agent)
-
-Add to any MCP-compatible agent (Claude Desktop, Cursor, Cline, etc.):
+## Connect (MCP)
 
 ```json
-{ "command": "npx", "args": ["ai-skills", "serve"] }
+{ "command": "npx", "args": ["ai-skills"] }
 ```
 
-This gives the agent 5 tools: `generate_qr_code`, `build_pdf`, `build_spreadsheet`, `generate_ical`, `generate_chart`.
+10 tools: `generate_qr_code`, `build_pdf`, `build_spreadsheet`, `generate_ical`, `generate_chart`, `generate_vcard`, `generate_barcode`, `generate_wav`, `generate_hash`, `create_zip`.
 
-## Use as npm library
-
-```bash
-npm install ai-skills
-```
+## Import (library)
 
 ```typescript
 import { skills } from "ai-skills";
-
-skills.generateQrCode({ data: "https://example.com" })           // → SVG string
-skills.buildPdf({ title: "Report", body: ["Hello."] })           // → { base64, size, pages }
-skills.buildSpreadsheet({ headers: ["A"], rows: [["1"]] })       // → CSV string
-skills.generateIcal({ events: [{ summary: "Meeting", start: "2025-03-15T14:00:00", end: "2025-03-15T15:00:00" }] }) // → .ics string
-skills.generateChart({ type: "bar", data: { Q1: 100, Q2: 200 } }) // → SVG string
 ```
 
 ## Skills
 
-- `generateQrCode({ data, size?, ecl?, fg?, bg? })` → SVG
-- `buildPdf({ title?, author?, date?, body, footer?, pageSize? })` → `{ base64, size, pages }`
-- `buildSpreadsheet({ headers, rows, summary?, format?, formulas?, bom? })` → CSV/TSV string
-- `generateIcal({ events, calendar_name?, method? })` → .ics string
-- `generateChart({ type, data, title?, width?, height?, colors? })` → SVG
+- `skills.generateQrCode({ data, size?, ecl?, fg?, bg? })` → SVG
+- `skills.buildPdf({ title?, author?, date?, body, footer?, pageSize? })` → `{ base64, size, pages }`
+- `skills.buildSpreadsheet({ headers, rows, summary?, format?, formulas?, bom? })` → CSV/TSV string
+- `skills.generateIcal({ events, calendar_name?, method? })` → .ics string
+- `skills.generateChart({ type, data, title?, width?, height?, colors? })` → SVG
+- `skills.generateVCard({ name, org?, title?, email?, phone?, address?, url?, note? })` → .vcf string
+- `skills.generateBarcode({ data, width?, height?, show_text? })` → SVG
+- `skills.generateWav({ frequency, duration, sample_rate?, volume?, waveform? })` → `{ base64, size, duration, frequency }`
+- `skills.generateHash({ data, algorithm?, encoding?, hmac_key? })` → `{ hash, algorithm, encoding, hmac }`
+- `skills.createZip({ files: [{ name, content }] })` → `{ base64, size, entries }`
 
 ## Full API reference
 

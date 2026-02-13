@@ -148,6 +148,137 @@ export function createMcpServer(): McpServer {
     }
   );
 
+  // ─── generate_vcard ────────────────────────────────────────────────────
+
+  server.tool(
+    "generate_vcard",
+    "Generate a vCard 4.0 (.vcf) contact file. RFC 6350 compliant.",
+    {
+      name: z.object({
+        given: z.string().describe("First name"),
+        family: z.string().describe("Last name"),
+        prefix: z.string().optional().describe("Prefix (e.g. Dr.)"),
+        suffix: z.string().optional().describe("Suffix (e.g. PhD)"),
+      }).describe("Contact name"),
+      org: z.string().optional().describe("Organization name"),
+      title: z.string().optional().describe("Job title"),
+      email: z.union([z.string(), z.array(z.string())]).optional().describe("Email address(es)"),
+      phone: z.union([z.string(), z.array(z.string())]).optional().describe("Phone number(s)"),
+      address: z.object({
+        street: z.string().optional(),
+        city: z.string().optional(),
+        state: z.string().optional(),
+        zip: z.string().optional(),
+        country: z.string().optional(),
+      }).optional().describe("Postal address"),
+      url: z.string().optional().describe("Website URL"),
+      note: z.string().optional().describe("Freeform note"),
+    },
+    async (input) => {
+      try {
+        const vcf = skills.generateVCard(input as any);
+        return { content: [{ type: "text", text: vcf }] };
+      } catch (e: any) {
+        return { content: [{ type: "text", text: `Error: ${e.message}` }], isError: true };
+      }
+    }
+  );
+
+  // ─── generate_barcode ──────────────────────────────────────────────────
+
+  server.tool(
+    "generate_barcode",
+    "Generate a Code128 1D barcode as SVG. Returns scannable barcode SVG markup.",
+    {
+      data: z.string().describe("Text to encode in the barcode"),
+      width: z.number().optional().describe("Image width in pixels (default: 300)"),
+      height: z.number().optional().describe("Bar height in pixels (default: 80)"),
+      show_text: z.boolean().optional().describe("Show text label below barcode (default: true)"),
+    },
+    async ({ data, width, height, show_text }) => {
+      try {
+        const svg = skills.generateBarcode({ data, width, height, show_text });
+        return { content: [{ type: "text", text: svg }] };
+      } catch (e: any) {
+        return { content: [{ type: "text", text: `Error: ${e.message}` }], isError: true };
+      }
+    }
+  );
+
+  // ─── generate_wav ──────────────────────────────────────────────────────
+
+  server.tool(
+    "generate_wav",
+    "Generate a WAV audio file (tone/beep). Returns base64-encoded PCM audio.",
+    {
+      frequency: z.number().describe("Tone frequency in Hz (20–20000)"),
+      duration: z.number().describe("Duration in seconds (0–30)"),
+      sample_rate: z.number().optional().describe("Sample rate (default: 44100)"),
+      volume: z.number().optional().describe("Volume 0.0–1.0 (default: 0.8)"),
+      waveform: z.enum(["sine", "square", "sawtooth"]).optional().describe("Waveform type (default: sine)"),
+    },
+    async ({ frequency, duration, sample_rate, volume, waveform }) => {
+      try {
+        const result = skills.generateWav({ frequency, duration, sample_rate, volume, waveform });
+        return {
+          content: [
+            { type: "text", text: `WAV generated: ${result.duration}s at ${result.frequency}Hz, ${result.size} bytes` },
+            { type: "text", text: `Base64: ${result.base64}` },
+          ],
+        };
+      } catch (e: any) {
+        return { content: [{ type: "text", text: `Error: ${e.message}` }], isError: true };
+      }
+    }
+  );
+
+  // ─── generate_hash ─────────────────────────────────────────────────────
+
+  server.tool(
+    "generate_hash",
+    "Compute a cryptographic hash (SHA-256, SHA-512, MD5, SHA-1) or HMAC signature.",
+    {
+      data: z.string().describe("Data to hash"),
+      algorithm: z.enum(["sha256", "sha512", "md5", "sha1"]).optional().describe("Hash algorithm (default: sha256)"),
+      encoding: z.enum(["hex", "base64"]).optional().describe("Output encoding (default: hex)"),
+      hmac_key: z.string().optional().describe("HMAC secret key (if provided, computes HMAC)"),
+    },
+    async ({ data, algorithm, encoding, hmac_key }) => {
+      try {
+        const result = skills.generateHash({ data, algorithm, encoding, hmac_key });
+        return { content: [{ type: "text", text: JSON.stringify(result) }] };
+      } catch (e: any) {
+        return { content: [{ type: "text", text: `Error: ${e.message}` }], isError: true };
+      }
+    }
+  );
+
+  // ─── create_zip ────────────────────────────────────────────────────────
+
+  server.tool(
+    "create_zip",
+    "Create a ZIP archive from file entries. Returns base64-encoded ZIP.",
+    {
+      files: z.array(z.object({
+        name: z.string().describe("File path within archive"),
+        content: z.string().describe("File content (text)"),
+      })).describe("Files to include in the archive"),
+    },
+    async ({ files }) => {
+      try {
+        const result = skills.createZip({ files });
+        return {
+          content: [
+            { type: "text", text: `ZIP created: ${result.entries} files, ${result.size} bytes` },
+            { type: "text", text: `Base64: ${result.base64}` },
+          ],
+        };
+      } catch (e: any) {
+        return { content: [{ type: "text", text: `Error: ${e.message}` }], isError: true };
+      }
+    }
+  );
+
   return server;
 }
 

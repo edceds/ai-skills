@@ -1,46 +1,21 @@
 # ai-skills — full API reference
 
-> Artifact-producing skills for AI agents. Generates files that LLMs cannot produce from their token stream: QR codes (SVG), PDFs, spreadsheets (CSV/TSV), iCalendar (.ics), and charts (SVG). Zero external dependencies. Ships as an MCP server, npm library, and Anthropic Agent Skills.
+> 10 artifact-producing skills for AI agents. Generates files LLMs cannot produce from their token stream. MCP server or TypeScript library. Zero external dependencies.
 
-## From source (if you're in the repo)
-
-```bash
-npx tsx src/cli.ts run qr-code --data "hello"      # run any skill
-npx tsx src/cli.ts list                             # list all skills
-```
-
-```typescript
-import { skills } from "./src/index.ts";            // import from source
-```
-
-## From npm
-
-```bash
-npm install ai-skills
-```
-
-```typescript
-import { skills } from "ai-skills";
-```
-
-## MCP server
+## Connect (MCP)
 
 Add to any MCP-compatible agent config:
 
 ```json
-{ "command": "npx", "args": ["ai-skills", "serve"] }
+{ "command": "npx", "args": ["ai-skills"] }
 ```
 
-Exposes 5 tools: `generate_qr_code`, `build_pdf`, `build_spreadsheet`, `generate_ical`, `generate_chart`. The agent discovers and calls them automatically.
+Exposes 10 tools: `generate_qr_code`, `build_pdf`, `build_spreadsheet`, `generate_ical`, `generate_chart`, `generate_vcard`, `generate_barcode`, `generate_wav`, `generate_hash`, `create_zip`. The agent discovers and calls them automatically.
 
-## CLI
+## Import (library)
 
-```bash
-npx ai-skills serve                          # Start MCP server
-npx ai-skills list                           # List skills
-npx ai-skills run qr-code --data "hello"     # Run a skill locally
-npx ai-skills init my-skill                  # Scaffold new skill
-npx ai-skills bundle pdf-builder             # Bundle for Anthropic upload
+```typescript
+import { skills } from "ai-skills";
 ```
 
 ---
@@ -58,15 +33,8 @@ Generate a QR code as SVG.
 
 **Returns:** SVG string
 
-**Example:**
 ```typescript
-const svg = skills.generateQrCode({
-  data: "https://example.com",
-  size: 300,
-  ecl: "H",
-  fg: "#000000",
-  bg: "#ffffff",
-});
+skills.generateQrCode({ data: "https://example.com", size: 300, ecl: "H" })
 ```
 
 ---
@@ -79,65 +47,45 @@ Generate a PDF document from structured content.
 - `title` (string, optional) — document title
 - `author` (string, optional) — author name
 - `date` (string, optional) — document date
-- `body` (array, required) — array of content blocks:
+- `body` (array, required) — content blocks:
   - `string` — paragraph text
   - `{ heading: string }` — section heading
   - `{ table: { headers: string[], rows: string[][] } }` — table
   - `{ list: string[] }` — bullet list
-- `footer` (string, optional) — footer text, use `{page}` for page number
-- `pageSize` ("letter" | "a4", default: "letter") — page dimensions
+- `footer` (string, optional) — footer text, `{page}` for page number
+- `pageSize` ("letter" | "a4", default: "letter")
 
 **Returns:** `{ base64: string, size: number, pages: number }`
 
-**Example:**
 ```typescript
-const result = skills.buildPdf({
-  title: "Quarterly Report",
-  author: "Finance Team",
-  date: "2025-01-15",
-  body: [
-    "Executive summary paragraph.",
-    { heading: "Revenue" },
-    "Revenue grew 15% quarter over quarter.",
-    { table: { headers: ["Region", "Q1", "Q2"], rows: [["US", "1.2M", "1.4M"]] } },
-    { list: ["First item", "Second item"] },
-  ],
-  footer: "Page {page}",
-  pageSize: "letter",
-});
-// result.base64 → base64-encoded PDF
-// result.pages → number of pages
+skills.buildPdf({
+  title: "Report",
+  body: ["Paragraph.", { heading: "Section" }, { list: ["A", "B"] }],
+})
 ```
 
 ---
 
 ## skills.buildSpreadsheet(input)
 
-Generate a CSV or TSV spreadsheet with proper escaping and formulas.
+Generate a CSV or TSV spreadsheet.
 
 **Input:**
-- `headers` (string[], required) — column headers
-- `rows` ((string | number | null)[][], required) — data rows
-- `summary` (Record<string, "sum" | "avg" | "min" | "max" | "count">, optional) — summary row aggregation per column
-- `format` ("csv" | "tsv", default: "csv") — output format
+- `headers` (string[], required)
+- `rows` ((string | number | null)[][], required)
+- `summary` (Record<string, "sum" | "avg" | "min" | "max" | "count">, optional)
+- `format` ("csv" | "tsv", default: "csv")
 - `formulas` (boolean, default: false) — process `=SUM`, `{row}` placeholders
-- `bom` (boolean, default: false) — prepend UTF-8 BOM for Excel compatibility
-- `sheets` (array, optional) — multiple sheets, each with `{ name?, headers, rows, summary? }`
+- `bom` (boolean, default: false) — UTF-8 BOM for Excel
 
 **Returns:** CSV/TSV string
 
-**Example:**
 ```typescript
-const csv = skills.buildSpreadsheet({
-  headers: ["Name", "Q1", "Q2", "Total"],
-  rows: [
-    ["Alice", 100, 120, "=SUM(B{row}:C{row})"],
-    ["Bob", 80, 90, "=SUM(B{row}:C{row})"],
-  ],
-  summary: { Q1: "sum", Q2: "sum", Total: "sum" },
-  format: "csv",
-  formulas: true,
-});
+skills.buildSpreadsheet({
+  headers: ["Name", "Q1", "Q2"],
+  rows: [["Alice", 100, 120], ["Bob", 80, 90]],
+  summary: { Q1: "sum", Q2: "sum" },
+})
 ```
 
 ---
@@ -147,41 +95,20 @@ const csv = skills.buildSpreadsheet({
 Generate an iCalendar (.ics) file. RFC 5545 compliant.
 
 **Input:**
-- `events` (array, required) — array of event objects:
-  - `summary` (string, required) — event title
-  - `start` (string, required) — ISO 8601 datetime
-  - `end` (string, required) — ISO 8601 datetime
-  - `description` (string, optional) — event details
-  - `location` (string, optional) — physical or virtual location
-  - `timezone` (string, optional) — IANA timezone (e.g. "America/New_York")
-  - `organizer` ({ name: string, email: string }, optional)
-  - `attendees` ({ name: string, email: string, rsvp?: boolean }[], optional)
-  - `alarm` ({ minutes_before: number }, optional) — reminder
-  - `rrule` (string, optional) — RFC 5545 recurrence rule (e.g. "FREQ=WEEKLY;COUNT=10")
-  - `status` ("CONFIRMED" | "TENTATIVE" | "CANCELLED", optional)
-  - `url` (string, optional) — event URL
-- `calendar_name` (string, optional) — calendar display name
-- `method` (string, optional) — iCal method (e.g. "REQUEST", "PUBLISH")
+- `events` (array, required):
+  - `summary` (string, required)
+  - `start` (string, required) — ISO 8601
+  - `end` (string, required) — ISO 8601
+  - `description`, `location`, `timezone`, `organizer`, `attendees`, `alarm`, `rrule`, `status`, `url` — all optional
+- `calendar_name` (string, optional)
+- `method` (string, optional)
 
 **Returns:** .ics string
 
-**Example:**
 ```typescript
-const ics = skills.generateIcal({
-  events: [{
-    summary: "Team Standup",
-    start: "2025-03-01T09:00:00",
-    end: "2025-03-01T09:15:00",
-    timezone: "America/New_York",
-    rrule: "FREQ=DAILY;BYDAY=MO,TU,WE,TH,FR",
-    organizer: { name: "Alice", email: "alice@company.com" },
-    attendees: [{ name: "Bob", email: "bob@company.com", rsvp: true }],
-    alarm: { minutes_before: 15 },
-    status: "CONFIRMED",
-  }],
-  calendar_name: "Work",
-  method: "REQUEST",
-});
+skills.generateIcal({
+  events: [{ summary: "Meeting", start: "2025-03-15T14:00:00", end: "2025-03-15T15:00:00", timezone: "America/New_York" }],
+})
 ```
 
 ---
@@ -191,63 +118,131 @@ const ics = skills.generateIcal({
 Generate an SVG chart from data.
 
 **Input:**
-- `type` ("bar" | "line" | "pie" | "scatter", required) — chart type
-- `data` (required):
-  - For bar/pie: `Record<string, number>` — key-value pairs (e.g. `{ "Q1": 100, "Q2": 200 }`)
-  - For line/scatter: `number[][]` — XY pairs (e.g. `[[1, 10], [2, 25], [3, 18]]`)
-- `title` (string, optional) — chart title
-- `width` (number, default: 600) — chart width in pixels
-- `height` (number, default: 400) — chart height in pixels
-- `colors` (string[], optional) — custom color palette
+- `type` ("bar" | "line" | "pie" | "scatter", required)
+- `data` — `Record<string, number>` for bar/pie, `number[][]` for line/scatter
+- `title` (string, optional)
+- `width` (number, default: 600)
+- `height` (number, default: 400)
+- `colors` (string[], optional)
 
 **Returns:** SVG string
 
-**Example:**
 ```typescript
-const svg = skills.generateChart({
-  type: "bar",
-  data: { "Q1": 100, "Q2": 150, "Q3": 200, "Q4": 180 },
-  title: "Revenue by Quarter",
-  width: 800,
-  height: 500,
-});
+skills.generateChart({ type: "bar", data: { Q1: 100, Q2: 200 }, title: "Revenue" })
 ```
 
 ---
 
-## Anthropic Agent Skills upload
+## skills.generateVCard(input)
 
-Bundle a skill for upload to the Anthropic API:
+Generate a vCard 4.0 (.vcf) contact file. RFC 6350 compliant.
 
-```bash
-npx ai-skills bundle qr-code
-```
+**Input:**
+- `name` ({ given: string, family: string, prefix?: string, suffix?: string }, required)
+- `org` (string, optional)
+- `title` (string, optional)
+- `email` (string | string[], optional)
+- `phone` (string | string[], optional)
+- `address` ({ street?, city?, state?, zip?, country? }, optional)
+- `url` (string, optional)
+- `note` (string, optional)
+- `photo_base64` (string, optional) — base64-encoded image
 
-Then upload via the Anthropic Python SDK:
-
-```python
-import anthropic
-from anthropic.lib import files_from_dir
-
-client = anthropic.Anthropic()
-skill = client.beta.skills.create(
-    display_title="QR Code",
-    files=files_from_dir("/path/to/qr-code"),
-    betas=["skills-2025-10-02"],
-)
-```
-
-Use in messages:
+**Returns:** .vcf string
 
 ```typescript
-const response = await client.beta.messages.create({
-  model: "claude-sonnet-4-20250514",
-  max_tokens: 4096,
-  betas: ["code-execution-2025-08-25", "skills-2025-10-02"],
-  container: {
-    skills: [{ type: "custom", skill_id: "skill_xxx", version: "latest" }],
-  },
-  messages: [{ role: "user", content: "Generate a QR code for https://example.com" }],
-  tools: [{ type: "code_execution_20250825", name: "code_execution" }],
-});
+skills.generateVCard({
+  name: { given: "Alice", family: "Smith" },
+  org: "Acme Corp",
+  email: "alice@example.com",
+  phone: "+1-555-0100",
+})
 ```
+
+---
+
+## skills.generateBarcode(input)
+
+Generate a Code128 1D barcode as SVG.
+
+**Input:**
+- `data` (string, required) — text to encode (printable ASCII)
+- `width` (number, default: 300) — image width in pixels
+- `height` (number, default: 80) — bar height in pixels
+- `show_text` (boolean, default: true) — show text label below barcode
+
+**Returns:** SVG string
+
+```typescript
+skills.generateBarcode({ data: "ABC-12345", width: 400, height: 100 })
+```
+
+---
+
+## skills.generateWav(input)
+
+Generate a WAV audio file (tone/beep).
+
+**Input:**
+- `frequency` (number, required) — Hz (20–20000)
+- `duration` (number, required) — seconds (0–30)
+- `sample_rate` (number, default: 44100)
+- `volume` (number, default: 0.8) — 0.0–1.0
+- `waveform` ("sine" | "square" | "sawtooth", default: "sine")
+
+**Returns:** `{ base64: string, size: number, duration: number, frequency: number }`
+
+```typescript
+skills.generateWav({ frequency: 440, duration: 1.0, waveform: "sine" })
+```
+
+---
+
+## skills.generateHash(input)
+
+Compute a cryptographic hash or HMAC signature.
+
+**Input:**
+- `data` (string, required)
+- `algorithm` ("sha256" | "sha512" | "md5" | "sha1", default: "sha256")
+- `encoding` ("hex" | "base64", default: "hex")
+- `hmac_key` (string, optional) — if provided, computes HMAC
+
+**Returns:** `{ hash: string, algorithm: string, encoding: string, hmac: boolean }`
+
+```typescript
+skills.generateHash({ data: "hello world", algorithm: "sha256" })
+skills.generateHash({ data: "message", algorithm: "sha256", hmac_key: "secret" })
+```
+
+---
+
+## skills.createZip(input)
+
+Create a ZIP archive from file entries.
+
+**Input:**
+- `files` (array, required):
+  - `name` (string) — file path within archive
+  - `content` (string) — file content
+
+**Returns:** `{ base64: string, size: number, entries: number }`
+
+```typescript
+skills.createZip({
+  files: [
+    { name: "readme.txt", content: "Hello world" },
+    { name: "data.csv", content: "a,b\n1,2" },
+  ],
+})
+```
+
+---
+
+## Add a skill
+
+Drop a folder into `skills/<name>/` with:
+- `SKILL.md` — frontmatter (`name`, `description`) + instructions
+- `scripts/<script>.ts` — implementation
+
+The MCP server and library API pick it up automatically.
