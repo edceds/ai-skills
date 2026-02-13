@@ -6,7 +6,21 @@ Artifact-producing [Agent Skills](https://platform.claude.com/docs/en/agents-and
 
 ## Use it
 
-**Agent reads your link** — share `https://github.com/edceds/ai-skills` in a chat. The agent reads [`llms.txt`](llms.txt) and knows every skill, its inputs, and how to call it. Follows the [llmstxt.org](https://llmstxt.org/) convention.
+**From this repo** — run a skill right now:
+
+```bash
+npx tsx src/cli.ts run qr-code --data "https://example.com"
+npx tsx src/cli.ts list    # see all skills
+```
+
+Or import from source:
+
+```typescript
+import { skills } from "./src/index.ts";
+skills.generateQrCode({ data: "https://example.com" })  // → SVG
+```
+
+**Agent reads your link** — share `https://github.com/edceds/ai-skills` in a chat. The agent reads [`llms.txt`](llms.txt) and knows every skill, inputs, and how to call it. Follows [llmstxt.org](https://llmstxt.org/).
 
 **MCP server** — add to Claude Desktop, Cursor, or any MCP-compatible agent:
 

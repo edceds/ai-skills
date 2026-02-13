@@ -1,10 +1,11 @@
 import { describe, it, expect } from "vitest";
 import { execFileSync } from "node:child_process";
 import { join } from "node:path";
-import { existsSync, rmSync } from "node:fs";
+import { existsSync, readFileSync, rmSync } from "node:fs";
 import { loadSkill, loadAllSkills, bundleSkill, skills } from "../src/index.js";
 
-const SKILLS_DIR = join(__dirname, "..", "skills");
+const ROOT = join(__dirname, "..");
+const SKILLS_DIR = join(ROOT, "skills");
 
 function run(skillDir: string, script: string, args: string[], stdin?: string): string {
   return execFileSync("npx", ["tsx", join(skillDir, script), ...args], {
@@ -327,10 +328,10 @@ describe("Bundle", () => {
 // ─── CLI ─────────────────────────────────────────────────────────────────────
 
 describe("CLI", () => {
-  const cli = join(__dirname, "..", "src", "cli.ts");
+  const cli = join(ROOT, "src", "cli.ts");
   function runCli(args: string[]): string {
     return execFileSync("npx", ["tsx", cli, ...args], {
-      cwd: join(__dirname, ".."), encoding: "utf-8", timeout: 30_000,
+      cwd: ROOT, encoding: "utf-8", timeout: 30_000,
     });
   }
 
@@ -344,7 +345,7 @@ describe("CLI", () => {
   });
 
   it("init scaffolds a new skill", () => {
-    const testDir = join(__dirname, "..", "skills", "test-scaffold-tmp");
+    const testDir = join(ROOT, "skills", "test-scaffold-tmp");
     try {
       runCli(["init", "test-scaffold-tmp"]);
       expect(existsSync(join(testDir, "SKILL.md"))).toBe(true);
@@ -359,5 +360,109 @@ describe("CLI", () => {
     const out = runCli(["bundle", "qr-code"]);
     expect(out).toContain("SKILL.md");
     expect(out).toContain("skills.create");
+  });
+});
+
+// ─── Agent access — can an AI agent actually use a skill? ────────────────────
+//
+// Simulates the real paths an agent would take after reading llms.txt or README.
+// If any of these fail, the repo is broken for agent use.
+
+describe("Agent access", () => {
+
+  // Path 1: agent reads llms.txt, runs CLI from repo root
+  // e.g. "npx tsx src/cli.ts run qr-code --data hello"
+  it("agent runs skill via CLI from repo root", () => {
+    const out = execFileSync("npx", ["tsx", "src/cli.ts", "run", "qr-code", "--data", "hello"], {
+      cwd: ROOT, encoding: "utf-8", timeout: 30_000,
+    });
+    expect(out).toContain("<svg");
+    expect(out).toContain("<rect");
+  });
+
+  // Path 2: agent reads SKILL.md, runs the script directly
+  // e.g. "npx tsx skills/qr-code/scripts/generate.ts --data hello"
+  it("agent runs skill script directly following SKILL.md", () => {
+    const out = execFileSync("npx", ["tsx", "skills/qr-code/scripts/generate.ts", "--data", "hello"], {
+      cwd: ROOT, encoding: "utf-8", timeout: 30_000,
+    });
+    expect(out).toContain("<svg");
+  });
+
+  // Path 3: agent imports library from source and calls a skill
+  it("agent imports library from source and calls a skill", () => {
+    const out = execFileSync("npx", ["tsx", "-e", `
+      import { skills } from "./src/index.ts";
+      const svg = skills.generateQrCode({ data: "https://example.com" });
+      if (!svg.includes("<svg")) { process.exit(1); }
+      console.log("ok:" + svg.length);
+    `], { cwd: ROOT, encoding: "utf-8", timeout: 30_000 });
+    expect(out).toContain("ok:");
+  });
+
+  // Path 4: MCP — agent calls a tool through the actual MCP server protocol
+  it("agent calls MCP tool and gets result", async () => {
+    const { Client } = await import("@modelcontextprotocol/sdk/client/index.js");
+    const { InMemoryTransport } = await import("@modelcontextprotocol/sdk/inMemory.js");
+    const { createMcpServer } = await import("../src/mcp.js");
+
+    const server = createMcpServer();
+    const client = new Client({ name: "test-agent", version: "1.0" });
+
+    const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
+    await server.connect(serverTransport);
+    await client.connect(clientTransport);
+
+    // Agent discovers tools
+    const { tools } = await client.listTools();
+    const toolNames = tools.map((t: any) => t.name).sort();
+    expect(toolNames).toEqual([
+      "build_pdf", "build_spreadsheet", "generate_chart", "generate_ical", "generate_qr_code",
+    ]);
+
+    // Agent calls generate_qr_code
+    const qr = await client.callTool({ name: "generate_qr_code", arguments: { data: "https://example.com" } });
+    expect((qr.content as any)[0].text).toContain("<svg");
+
+    // Agent calls build_spreadsheet
+    const csv = await client.callTool({
+      name: "build_spreadsheet",
+      arguments: { headers: ["Name", "Score"], rows: [["Alice", 95], ["Bob", 87]] },
+    });
+    expect((csv.content as any)[0].text).toContain("Name,Score");
+    expect((csv.content as any)[0].text).toContain("Alice,95");
+
+    // Agent calls generate_chart
+    const chart = await client.callTool({
+      name: "generate_chart",
+      arguments: { type: "bar", data: { Q1: 100, Q2: 200 }, title: "Revenue" },
+    });
+    expect((chart.content as any)[0].text).toContain("<svg");
+
+    await client.close();
+    await server.close();
+  });
+
+  // Path 5: llms.txt exists and is parseable
+  it("llms.txt is present and contains skill info", () => {
+    const llms = readFileSync(join(ROOT, "llms.txt"), "utf-8");
+    expect(llms).toContain("generateQrCode");
+    expect(llms).toContain("buildPdf");
+    expect(llms).toContain("buildSpreadsheet");
+    expect(llms).toContain("generateIcal");
+    expect(llms).toContain("generateChart");
+    expect(llms).toContain("npx");
+  });
+
+  // Path 6: every SKILL.md references a script that exists and is runnable
+  it("every SKILL.md references a real script in quick-start", () => {
+    for (const skill of loadAllSkills(SKILLS_DIR)) {
+      // Extract "scripts/something.ts" from the code blocks
+      const refs = skill.instructions.match(/scripts\/\S+\.ts/g);
+      expect(refs).toBeTruthy();
+      for (const ref of refs!) {
+        expect(existsSync(join(skill.directory, ref))).toBe(true);
+      }
+    }
   });
 });

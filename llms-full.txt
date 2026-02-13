@@ -2,7 +2,18 @@
 
 > Artifact-producing skills for AI agents. Generates files that LLMs cannot produce from their token stream: QR codes (SVG), PDFs, spreadsheets (CSV/TSV), iCalendar (.ics), and charts (SVG). Zero external dependencies. Ships as an MCP server, npm library, and Anthropic Agent Skills.
 
-## Installation
+## From source (if you're in the repo)
+
+```bash
+npx tsx src/cli.ts run qr-code --data "hello"      # run any skill
+npx tsx src/cli.ts list                             # list all skills
+```
+
+```typescript
+import { skills } from "./src/index.ts";            // import from source
+```
+
+## From npm
 
 ```bash
 npm install ai-skills

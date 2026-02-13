@@ -2,7 +2,28 @@
 
 > Artifact-producing skills for AI agents. Generates files that LLMs cannot produce from their token stream: QR codes (SVG), PDFs, spreadsheets (CSV/TSV), iCalendar (.ics), and charts (SVG). Zero external dependencies.
 
-## Use instantly (MCP)
+## If you're in this repo (from source)
+
+Run any skill right now:
+
+```bash
+npx tsx src/cli.ts run qr-code --data "https://example.com"
+npx tsx src/cli.ts run chart-generator bar --stdin <<< '{"Q1":100,"Q2":200}'
+npx tsx src/cli.ts run pdf-builder --stdin <<< '{"title":"Report","body":["Hello."]}'
+npx tsx src/cli.ts run spreadsheet-builder --stdin <<< '{"headers":["A","B"],"rows":[["1","2"]]}'
+npx tsx src/cli.ts run ical-generator --stdin <<< '{"events":[{"summary":"Meeting","start":"2025-03-15T14:00:00","end":"2025-03-15T15:00:00"}]}'
+```
+
+Or import directly:
+
+```typescript
+import { skills } from "./src/index.ts";
+skills.generateQrCode({ data: "https://example.com" })  // → SVG string
+```
+
+List all skills: `npx tsx src/cli.ts list`
+
+## Use via MCP (any agent)
 
 Add to any MCP-compatible agent (Claude Desktop, Cursor, Cline, etc.):
 
@@ -12,7 +33,7 @@ Add to any MCP-compatible agent (Claude Desktop, Cursor, Cline, etc.):
 
 This gives the agent 5 tools: `generate_qr_code`, `build_pdf`, `build_spreadsheet`, `generate_ical`, `generate_chart`.
 
-## Use as a library
+## Use as npm library
 
 ```bash
 npm install ai-skills
